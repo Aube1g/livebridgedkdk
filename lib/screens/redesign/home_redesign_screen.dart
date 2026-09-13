@@ -247,7 +247,7 @@ class _HomeRedesignScreenState extends State<HomeRedesignScreen>
 
   Future<void> _openAuthorPage() async {
     unawaited(LiveBridgeHaptics.openSurface());
-    const Uri authorUri = Uri.parse('https://t.me/Aubeig');
+    final Uri authorUri = Uri.parse('https://t.me/Aubeig');
     final bool opened = await launchUrl(
       authorUri,
       mode: LaunchMode.inAppBrowserView,
