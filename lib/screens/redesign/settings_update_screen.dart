@@ -33,6 +33,7 @@ class _SettingsUpdateScreenState extends State<SettingsUpdateScreen>
     with SingleTickerProviderStateMixin {
   static const String _projectGithubUrl =
       'https://github.com/appsfolder/livebridge';
+  static const String _authorTelegramUrl = 'https://t.me/Aubeig';
   static const String _projectDownloadPageUrl =
       'https://appsfolder.github.io/livebridge/';
   static const String _latestReleaseApiUrl =
@@ -153,6 +154,15 @@ class _SettingsUpdateScreenState extends State<SettingsUpdateScreen>
     );
     if (!opened && mounted) {
       showLbToast(context, message: AppStrings.of(context).githubOpenFailed);
+    }
+  }
+
+  Future<void> _openAuthorPage() async {
+    final bool opened = await _launchUrlWithFallback(
+      Uri.parse(_authorTelegramUrl),
+    );
+    if (!opened && mounted) {
+      showLbToast(context, message: AppStrings.of(context).linkOpenFailed);
     }
   }
 
@@ -552,6 +562,19 @@ class _SettingsUpdateScreenState extends State<SettingsUpdateScreen>
               onTap: () {
                 unawaited(LiveBridgeHaptics.openSurface());
                 unawaited(_openGithub());
+              },
+            ),
+            LbListItemData(
+              title: strings.madeByTitle,
+              showChevron: false,
+              trailingWidget: LbIcon(
+                symbol: LbIconSymbol.externalLink,
+                size: 24,
+                color: palette.textPrimary,
+              ),
+              onTap: () {
+                unawaited(LiveBridgeHaptics.openSurface());
+                unawaited(_openAuthorPage());
               },
             ),
           ],

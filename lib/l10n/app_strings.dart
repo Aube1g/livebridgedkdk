@@ -1664,6 +1664,16 @@ class AppStrings {
         '시도하거나 업무 프로필을 제거해 보세요.',
   );
 
+  String get madeByTitle => tr(
+    en: 'Made by Aubeig',
+    ru: 'Сделано Aubeig',
+    tr: 'Yapan: Aubeig',
+    ptBr: 'Feito por Aubeig',
+    zhHans: '作者：Aubeig',
+    zhHant: '作者：Aubeig',
+    ko: '제작: Aubeig',
+  );
+
   String get capsuleOverlay => tr(
     en: 'Floating capsule',
     ru: 'Плавающая капсула',
