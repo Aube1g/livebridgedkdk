@@ -13,6 +13,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.ProgressBar
+import android.util.Log
 import android.widget.TextView
 import com.appsfolder.livebridge.MainActivity
 import com.appsfolder.livebridge.R
@@ -73,7 +74,9 @@ class CapsuleOverlayManager(appContext: Context) {
     private var suppressedKey: String? = null
 
     fun show(payload: CapsulePayload) {
-        if (!shouldShow(payload)) {
+        val skip = showSkipReason(payload)
+        if (skip != null) {
+            Log.d(TAG, "show skipped ($skip): ${payload.packageName} | ${payload.title}")
             removeView()
             return
         }
@@ -84,10 +87,12 @@ class CapsuleOverlayManager(appContext: Context) {
             try {
                 windowManager.addView(created, createLayoutParams())
             } catch (error: Throwable) {
+                Log.w(TAG, "addView failed", error)
                 return
             }
             view = created
             target = created
+            Log.d(TAG, "capsule shown: ${payload.packageName} | ${payload.title}")
         }
         bindView(target, payload)
     }
@@ -116,21 +121,27 @@ class CapsuleOverlayManager(appContext: Context) {
         hide()
     }
 
-    private fun shouldShow(payload: CapsulePayload): Boolean {
+    private fun showSkipReason(payload: CapsulePayload): String? {
         if (Build.VERSION.SDK_INT >= LIVE_UPDATES_MIN_SDK_INT) {
-            return false
+            return "sdk-36-plus"
         }
         if (MainActivity.appInForeground) {
-            return false
+            return "app-foreground"
         }
         if (suppressedKey == payload.suppressKey) {
-            return false
+            return "suppressed"
         }
         return try {
-            Settings.canDrawOverlays(context) &&
+            if (
+                Settings.canDrawOverlays(context) &&
                 ConverterPrefs(context).getCapsuleOverlayEnabled()
+            ) {
+                null
+            } else {
+                "permission-or-pref"
+            }
         } catch (error: Throwable) {
-            false
+            "error: $error"
         }
     }
 
@@ -289,6 +300,7 @@ class CapsuleOverlayManager(appContext: Context) {
     }
 
     private companion object {
+        const val TAG = "CapsuleOverlay"
         const val LIVE_UPDATES_MIN_SDK_INT = 36
     }
 }
