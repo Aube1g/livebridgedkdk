@@ -1632,6 +1632,38 @@ class AppStrings {
         '변환된 알림이 일반 알림으로 표시됩니다.',
   );
 
+  String get listenerRestrictedHint => tr(
+    en:
+        "If your phone shows 'Restricted setting', a device policy "
+        '(work profile / MDM) is blocking the toggle. Try Developer options '
+        '→ Disable restricted settings, or remove the work profile.',
+    ru:
+        'Если телефон показывает «Ограниченный параметр», это политика '
+        'устройства (рабочий профиль / MDM) блокирует тумблер. Попробуйте '
+        '«Параметры разработчика» → «Отключить ограниченные параметры» '
+        'или удалите рабочий профиль.',
+    tr:
+        "Telefonunuz 'Kısıtlı ayar' gösteriyorsa bir cihaz politikası "
+        '(iş profili / MDM) anahtarı engelliyor. Geliştirici seçenekleri '
+        '→ Kısıtlı ayarları devre dışı bırak'
+        "ı deneyin veya iş profilini kaldırın.",
+    ptBr:
+        "Se o celular exibir 'Restricted setting' (Configuração restrita), "
+        'uma política do dispositivo (perfil de trabalho / MDM) está '
+        'bloqueando a alternância. Tente Opções do desenvolvedor → '
+        'Desativar configurações restritas ou remova o perfil de trabalho.',
+    zhHans:
+        '如果手机显示「受限设置」，说明设备策略（工作资料 / MDM）正在阻止该开关。'
+        '请尝试「开发人员选项」→「停用受限设置」，或移除工作资料。',
+    zhHant:
+        '如果手機顯示「受限設定」，說明裝置策略（工作資料 / MDM）正在阻止該開關。'
+        '請嘗試「開發人員選項」→「停用受限設定」，或移除工作資料。',
+    ko:
+        "폰에서 '제한된 설정'이 표시되면 장치 정책(업무 프로필 / MDM)이 "
+        '토글을 차단하고 있습니다. 개발자 옵션 → 제한된 설정 비활성화를 '
+        '시도하거나 업무 프로필을 제거해 보세요.',
+  );
+
   String get settingsTitle => tr(
     en: 'Settings',
     ru: 'Настройки',

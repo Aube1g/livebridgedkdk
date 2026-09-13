@@ -135,9 +135,11 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
     required bool enabled,
     required VoidCallback onTap,
     bool unavailable = false,
+    String? description,
   }) {
     return LbListItemData(
       title: title,
+      description: description,
       trailingIcon: enabled
           ? null
           : (unavailable ? LbIconSymbol.info : LbIconSymbol.alertOctagonFilled),
@@ -158,6 +160,8 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
       _buildPermissionItem(
         title: strings.listenerAccess,
         enabled: _listenerEnabled,
+        description:
+            _listenerEnabled ? null : strings.listenerRestrictedHint,
         onTap: () {
           unawaited(_openListenerSettings());
         },

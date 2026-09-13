@@ -620,7 +620,7 @@ class _LbTitleLine extends StatelessWidget {
                   GestureDetector(
                     key: descriptionIconKey,
                     behavior: HitTestBehavior.opaque,
-                    onTap: enabled ? onDescriptionTap : null,
+                    onTap: onDescriptionTap,
                     child: LbIcon(
                       symbol: LbIconSymbol.info,
                       size: LbSpacing.listDescriptionIconSize,
