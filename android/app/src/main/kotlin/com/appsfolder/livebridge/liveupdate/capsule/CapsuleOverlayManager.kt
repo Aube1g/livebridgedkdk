@@ -385,8 +385,8 @@ class CapsuleOverlayManager(appContext: Context) {
         if (savedX >= 0 && savedY >= 0) {
             params.gravity = Gravity.TOP or Gravity.START
             val metrics = context.resources.displayMetrics
-            params.x = savedX.coerceIn(0, (metrics.widthPixels - dp(80)).coerceAtLeast(0))
-            params.y = savedY.coerceIn(0, (metrics.heightPixels - dp(60)).coerceAtLeast(0))
+            params.x = savedX.coerceIn(0, (metrics.widthPixels - dp(80f)).coerceAtLeast(0))
+            params.y = savedY.coerceIn(0, (metrics.heightPixels - dp(60f)).coerceAtLeast(0))
         } else {
             params.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             params.y = statusBarHeightPx() + dp(6f)
