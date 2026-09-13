@@ -90,6 +90,7 @@ class _LiveBridgeHomePageState extends State<LiveBridgeHomePage>
   bool _showBackgroundWarning = false;
   bool _showSamsungDeveloperWarning = false;
   bool _hidePromotedAccess = false;
+  int _androidSdkInt = 0;
   bool _isAospDevice = false;
   bool _updateChecksEnabled = true;
   bool _updateAvailable = false;
@@ -119,10 +120,15 @@ class _LiveBridgeHomePageState extends State<LiveBridgeHomePage>
 
   bool get _canToggleMaster => _listenerEnabled && _notificationsGranted;
   bool get _masterSwitchValue => _canToggleMaster && _converterEnabled;
+  bool get _liveUpdatesUnavailableOnOs =>
+      _androidSdkInt > 0 &&
+      _androidSdkInt < DeviceInfo.liveUpdatesMinimumSdkInt;
   bool get _hasAllAccessPermissions =>
       _listenerEnabled &&
       _notificationsGranted &&
-      (_hidePromotedAccess || _canPostPromoted);
+      (_hidePromotedAccess ||
+          _canPostPromoted ||
+          _liveUpdatesUnavailableOnOs);
   bool get _hasUpdateAlert => _updateChecksEnabled && _updateAvailable;
 
   @override
@@ -312,7 +318,9 @@ class _LiveBridgeHomePageState extends State<LiveBridgeHomePage>
         final bool allAccessPermissionsGranted =
             listenerEnabled &&
             notificationsGranted &&
-            (deviceInfo.shouldHideLiveUpdatesPromotion || canPostPromoted);
+            (deviceInfo.shouldHideLiveUpdatesPromotion ||
+                canPostPromoted ||
+                deviceInfo.liveUpdatesUnavailableOnOs);
         if (!_didInitSectionDefaults) {
           if (!_hasPersistedExpandedSections) {
             if (allAccessPermissionsGranted) {
@@ -361,6 +369,7 @@ class _LiveBridgeHomePageState extends State<LiveBridgeHomePage>
         _currentAppVersion = currentAppVersion;
         _hasCustomParserDictionary = hasCustomParserDictionary;
         _hidePromotedAccess = deviceInfo.shouldHideLiveUpdatesPromotion;
+        _androidSdkInt = deviceInfo.sdkInt;
         _isAospDevice = deviceInfo.isAospDevice;
         _showBackgroundWarning =
             !deviceInfo.isPixel &&
@@ -1125,6 +1134,10 @@ class _LiveBridgeHomePageState extends State<LiveBridgeHomePage>
 
   Future<void> _openPromotedSettings() async {
     LiveBridgeHaptics.openSurface();
+    if (_liveUpdatesUnavailableOnOs) {
+      _snack(AppStrings.of(context).liveUpdatesOsUnavailable);
+      return;
+    }
     final bool opened =
         await LiveBridgePlatform.openPromotedNotificationSettings();
     if (!mounted || opened) return;

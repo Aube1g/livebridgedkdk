@@ -373,7 +373,12 @@ class LiveBridgePlatform {
     final Map<String, dynamic> m = res == null
         ? const <String, dynamic>{}
         : Map<String, dynamic>.from(res);
+    final Object? rawSdkInt = m['sdkInt'];
+    final int sdkInt = rawSdkInt is int
+        ? rawSdkInt
+        : int.tryParse(rawSdkInt?.toString() ?? '') ?? 0;
     return DeviceInfo(
+      sdkInt: sdkInt,
       manufacturer: (m['manufacturer'] as String?) ?? '',
       brand: (m['brand'] as String?) ?? '',
       marketName:

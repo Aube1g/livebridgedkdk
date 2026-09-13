@@ -1172,6 +1172,7 @@ class MainActivity : FlutterActivity() {
     private fun getDeviceInfo(): Map<String, String> {
         val mn = DeviceProps.marketName()
         return mapOf(
+            "sdkInt" to Build.VERSION.SDK_INT.toString(),
             "manufacturer" to (Build.MANUFACTURER ?: ""),
             "brand" to (Build.BRAND ?: ""),
             "model" to mn,

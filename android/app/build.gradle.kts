@@ -40,8 +40,11 @@ android {
         applicationId = "com.appsfolder.livebridge"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // Live Updates are available starting from Android 16 (API 36).
-        minSdk = 36
+        // LiveBridge works on Android 13 (API 33) and newer.
+        // The Live Updates island surface requires Android 16 (API 36)+; on
+        // older Android versions converted notifications are shown as regular
+        // high-priority ongoing notifications.
+        minSdk = 33
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

@@ -26,6 +26,11 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
   bool _notificationsGranted = false;
   bool _canPostPromoted = false;
   bool _hidePromotedAccess = false;
+  int _androidSdkInt = 0;
+
+  bool get _liveUpdatesUnavailableOnOs =>
+      _androidSdkInt > 0 &&
+      _androidSdkInt < DeviceInfo.liveUpdatesMinimumSdkInt;
 
   @override
   void initState() {
@@ -75,6 +80,7 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
         _notificationsGranted = notificationsGranted;
         _canPostPromoted = canPostPromoted;
         _hidePromotedAccess = deviceInfo.shouldHideLiveUpdatesPromotion;
+        _androidSdkInt = deviceInfo.sdkInt;
       });
     } catch (_) {}
   }
@@ -112,6 +118,10 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
 
   Future<void> _openPromotedSettings() async {
     unawaited(LiveBridgeHaptics.openSurface());
+    if (_liveUpdatesUnavailableOnOs) {
+      _snack(AppStrings.of(context).liveUpdatesOsUnavailable);
+      return;
+    }
     final bool opened =
         await LiveBridgePlatform.openPromotedNotificationSettings();
     if (!mounted || opened) {
@@ -124,11 +134,18 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
     required String title,
     required bool enabled,
     required VoidCallback onTap,
+    bool unavailable = false,
   }) {
     return LbListItemData(
       title: title,
-      trailingIcon: enabled ? null : LbIconSymbol.alertOctagonFilled,
-      trailingIconColor: enabled ? null : LbPalette.of(context).warning,
+      trailingIcon: enabled
+          ? null
+          : (unavailable ? LbIconSymbol.info : LbIconSymbol.alertOctagonFilled),
+      trailingIconColor: enabled
+          ? null
+          : (unavailable
+              ? LbPalette.of(context).textSecondary
+              : LbPalette.of(context).warning),
       onTap: onTap,
     );
   }
@@ -160,6 +177,7 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
         _buildPermissionItem(
           title: strings.liveUpdatesAccess,
           enabled: _canPostPromoted,
+          unavailable: _liveUpdatesUnavailableOnOs,
           onTap: () {
             unawaited(_openPromotedSettings());
           },

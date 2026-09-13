@@ -15,11 +15,14 @@ class InstalledApp {
 }
 
 class DeviceInfo {
+  static const int liveUpdatesMinimumSdkInt = 36;
+
   const DeviceInfo({
     required this.manufacturer,
     required this.brand,
     required this.marketName,
     required this.model,
+    this.sdkInt = 0,
     this.rawModel = '',
     this.product = '',
     this.device = '',
@@ -52,6 +55,18 @@ class DeviceInfo {
   final String user;
   final String fingerprint;
   final String display;
+  final int sdkInt;
+
+  /// Whether the device's Android version supports the native Live Updates
+  /// island surface. On older versions converted notifications fall back to
+  /// regular high-priority ongoing notifications.
+  bool get supportsLiveUpdatesSurface =>
+      sdkInt >= liveUpdatesMinimumSdkInt;
+
+  /// True when the device's Android version is known and too old for the
+  /// Live Updates island surface (API level 36 / Android 16+).
+  bool get liveUpdatesUnavailableOnOs =>
+      sdkInt > 0 && sdkInt < liveUpdatesMinimumSdkInt;
 
   bool get isPixel {
     final String all = '$manufacturer $brand $marketName $model'.toLowerCase();

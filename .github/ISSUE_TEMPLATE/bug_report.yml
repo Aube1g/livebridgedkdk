@@ -16,8 +16,10 @@ body:
         Issues or questions about Android installer errors like "There is a
         problem when parsing the software package" / "There was a problem
         parsing the package" are not accepted and may be closed automatically.
-        Before installing the APK, use Android 16+ and disable Play Protect for
-        the installation.
+        Before installing the APK, use Android 13+ and disable Play Protect for
+        the installation. The Live Updates island surface requires Android 16+;
+        on Android 13-15 converted notifications appear as regular
+        notifications.
 
   - type: textarea
     id: summary

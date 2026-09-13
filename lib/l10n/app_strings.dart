@@ -1612,6 +1612,26 @@ class AppStrings {
     ko: 'Live Updates 권한',
   );
 
+  String get liveUpdatesOsUnavailable => tr(
+    en:
+        'Live Updates requires Android 16 or newer. On this device, '
+        'converted notifications appear as regular notifications.',
+    ru:
+        'Live Updates требует Android 16 или новее. На этом устройстве '
+        'конвертированные уведомления отображаются как обычные уведомления.',
+    tr:
+        'Live Updates Android 16 veya üzerine ihtiyaç duyar. Bu cihazda '
+        'dönüştürülen bildirimler normal bildirim olarak görünür.',
+    ptBr:
+        'O Live Updates requer Android 16 ou mais novo. Neste dispositivo, '
+        'as notificações convertidas aparecem como notificações normais.',
+    zhHans: 'Live Updates 需要 Android 16 或更高版本。在此设备上，转换的通知将显示为普通通知。',
+    zhHant: 'Live Updates 需要 Android 16 或更高版本。在此裝置上，轉換的通知將顯示為普通通知。',
+    ko:
+        'Live Updates에는 Android 16 이상 필요합니다. 이 기기에서는 '
+        '변환된 알림이 일반 알림으로 표시됩니다.',
+  );
+
   String get settingsTitle => tr(
     en: 'Settings',
     ru: 'Настройки',

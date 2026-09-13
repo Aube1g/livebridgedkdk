@@ -56,6 +56,7 @@ class _HomeRedesignScreenState extends State<HomeRedesignScreen>
   bool _notificationsGranted = false;
   bool _canPostPromoted = false;
   bool _hidePromotedAccess = false;
+  int _androidSdkInt = 0;
   bool _updateAvailable = false;
   String _currentAppVersion = 'v1.3.4';
   String _latestReleaseVersion = '';
@@ -264,10 +265,16 @@ class _HomeRedesignScreenState extends State<HomeRedesignScreen>
   bool get _displayMasterSwitchValue =>
       _canToggleMaster && _isLiveBridgeRunning;
 
+  bool get _liveUpdatesUnavailableOnOs =>
+      _androidSdkInt > 0 &&
+      _androidSdkInt < DeviceInfo.liveUpdatesMinimumSdkInt;
+
   bool get _hasPermissionIssues {
     return !(_listenerEnabled &&
         _notificationsGranted &&
-        (_hidePromotedAccess || _canPostPromoted));
+        (_hidePromotedAccess ||
+            _canPostPromoted ||
+            _liveUpdatesUnavailableOnOs));
   }
 
   String get _displayVersion {
@@ -347,6 +354,7 @@ class _HomeRedesignScreenState extends State<HomeRedesignScreen>
         _notificationsGranted = notificationsGranted;
         _canPostPromoted = canPostPromoted;
         _hidePromotedAccess = deviceInfo.shouldHideLiveUpdatesPromotion;
+        _androidSdkInt = deviceInfo.sdkInt;
         _isLiveBridgeRunning = converterEnabled;
         _updateAvailable = sanitizedUpdateAvailable;
         _latestReleaseVersion = sanitizedLatestReleaseVersion;
