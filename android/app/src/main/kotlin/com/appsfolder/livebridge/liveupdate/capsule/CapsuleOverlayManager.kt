@@ -35,11 +35,13 @@ data class CapsulePayload(
                 ?.toString()?.trim().orEmpty()
             val text = extras.getCharSequence(Notification.EXTRA_TEXT)
                 ?.toString()?.trim().orEmpty()
-            val progressMax = notification.progressMax
-            val progress = if (notification.isIndeterminate || progressMax <= 0) {
+            val progressMax = extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0)
+            val indeterminate =
+                extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false)
+            val progress = if (indeterminate || progressMax <= 0) {
                 0
             } else {
-                notification.progress
+                extras.getInt(Notification.EXTRA_PROGRESS, 0)
             }
             return CapsulePayload(
                 title = title,

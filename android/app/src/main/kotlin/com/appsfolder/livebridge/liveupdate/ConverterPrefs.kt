@@ -1140,6 +1140,7 @@ class ConverterPrefs(context: Context) {
         private const val KEY_CONVERTED_NOTIFICATION_SOUND_ENABLED =
             "converted_notification_sound_enabled"
         private const val KEY_HINTS_DISABLED = "hints_disabled"
+        private const val KEY_CAPSULE_OVERLAY_ENABLED = "capsule_overlay_enabled"
         private const val KEY_CONVERSION_LOG_ENABLED = "conversion_log_enabled"
         private const val KEY_BUG_REPORT_AUTO_COPY_ENABLED = "bug_report_auto_copy_enabled"
         private const val KEY_APP_LANGUAGE_TAG = "app_language_tag"
