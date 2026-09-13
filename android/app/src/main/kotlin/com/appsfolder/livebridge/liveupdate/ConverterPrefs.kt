@@ -114,6 +114,14 @@ class ConverterPrefs(context: Context) {
         prefs.edit().putBoolean(KEY_HINTS_DISABLED, value).apply()
     }
 
+    fun getCapsuleOverlayEnabled(): Boolean {
+        return prefs.getBoolean(KEY_CAPSULE_OVERLAY_ENABLED, true)
+    }
+
+    fun setCapsuleOverlayEnabled(value: Boolean) {
+        prefs.edit().putBoolean(KEY_CAPSULE_OVERLAY_ENABLED, value).apply()
+    }
+
     fun getConversionLogEnabled(): Boolean {
         return prefs.getBoolean(KEY_CONVERSION_LOG_ENABLED, false)
     }

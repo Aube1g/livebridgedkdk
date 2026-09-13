@@ -1664,6 +1664,54 @@ class AppStrings {
         '시도하거나 업무 프로필을 제거해 보세요.',
   );
 
+  String get capsuleOverlay => tr(
+    en: 'Floating capsule',
+    ru: 'Плавающая капсула',
+    tr: 'Yüzen kapsül',
+    ptBr: 'Cápsula flutuante',
+    zhHans: '悬浮胶囊',
+    zhHant: '懸浮膠囊',
+    ko: '부유 캡슐',
+  );
+
+  String get capsuleOverlayDescription => tr(
+    en:
+        'Show converted notifications in a floating capsule above other '
+        'apps (Android 13–15). Requires the "Display over other apps" '
+        'permission.',
+    ru:
+        'Показывает конвертации в плавающей капсуле поверх других '
+        'приложений (Android 13–15). Нужна настройка «Отображение поверх '
+        'других приложений».',
+    tr:
+        "Dönüştürülen bildirimleri diğer uygulamaların üzerinde yüzen bir "
+        "kapsülde gösterir (Android 13–15). 'Diğer uygulamaların üzerinde "
+        "görüntüleme' izni gerekir.",
+    ptBr:
+        'Mostra as notificações convertidas em uma cápsula flutuante acima '
+        'dos outros apps (Android 13–15). Exige a permissão "Exibir por '
+        'cima de outros apps".',
+    zhHans:
+        '在其他应用上方以悬浮胶囊显示已转换的通知（Android 13–15）。'
+        '需要「显示在其他应用上层」权限。',
+    zhHant:
+        '在其他應用程式上方以懸浮膠囊顯示已轉換的通知（Android 13–15）。'
+        '需要「顯示在其他應用程式上方」權限。',
+    ko:
+        '변환된 알림을 다른 앱 위에 떠 있는 캡슐로 표시합니다(Android '
+        '13–15). "다른 앱 위에 표시" 권한이 필요합니다.',
+  );
+
+  String get overlayUnavailable => tr(
+    en: "Couldn't open the overlay permission settings.",
+    ru: 'Не удалось открыть настройки разрешения.',
+    tr: 'Yükleme izni ayarları açılamadı.',
+    ptBr: 'Não foi possível abrir as configurações da permissão.',
+    zhHans: '无法打开权限设置。',
+    zhHant: '無法開啟權限設定。',
+    ko: '권한 설정을 열 수 없습니다.',
+  );
+
   String get settingsTitle => tr(
     en: 'Settings',
     ru: 'Настройки',

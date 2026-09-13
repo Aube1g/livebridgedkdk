@@ -27,9 +27,15 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
   bool _canPostPromoted = false;
   bool _hidePromotedAccess = false;
   int _androidSdkInt = 0;
+  bool _overlayGranted = false;
+  bool _capsulePrefEnabled = true;
 
   bool get _liveUpdatesUnavailableOnOs =>
       _androidSdkInt > 0 &&
+      _androidSdkInt < DeviceInfo.liveUpdatesMinimumSdkInt;
+
+  bool get _capsuleRowVisible =>
+      _androidSdkInt == 0 ||
       _androidSdkInt < DeviceInfo.liveUpdatesMinimumSdkInt;
 
   @override
@@ -69,6 +75,9 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
           await LiveBridgePlatform.isNotificationPermissionGranted();
       final bool canPostPromoted =
           await LiveBridgePlatform.canPostPromotedNotifications();
+      final bool overlayGranted = await LiveBridgePlatform.hasOverlayPermission();
+      final bool capsulePrefEnabled =
+          await LiveBridgePlatform.getCapsuleOverlayEnabled();
       final DeviceInfo deviceInfo = await LiveBridgePlatform.getDeviceInfo();
 
       if (!mounted) {
@@ -81,6 +90,8 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
         _canPostPromoted = canPostPromoted;
         _hidePromotedAccess = deviceInfo.shouldHideLiveUpdatesPromotion;
         _androidSdkInt = deviceInfo.sdkInt;
+        _overlayGranted = overlayGranted;
+        _capsulePrefEnabled = capsulePrefEnabled;
       });
     } catch (_) {}
   }
@@ -114,6 +125,24 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
       return;
     }
     _snack(AppStrings.of(context).notificationsUnavailable);
+  }
+
+  Future<void> _setCapsuleEnabled(bool value) async {
+    if (value) {
+      if (!_overlayGranted) {
+        unawaited(LiveBridgeHaptics.openSurface());
+        final bool opened = await LiveBridgePlatform.openOverlaySettings();
+        if (!mounted || opened) {
+          return;
+        }
+        _snack(AppStrings.of(context).overlayUnavailable);
+        return;
+      }
+      await LiveBridgePlatform.setCapsuleOverlayEnabled(true);
+    } else {
+      await LiveBridgePlatform.setCapsuleOverlayEnabled(false);
+    }
+    await _loadState();
   }
 
   Future<void> _openPromotedSettings() async {
@@ -177,6 +206,16 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
           }
         },
       ),
+      if (_capsuleRowVisible)
+        LbListItemData(
+          title: strings.capsuleOverlay,
+          description: strings.capsuleOverlayDescription,
+          toggleValue: _overlayGranted && _capsulePrefEnabled,
+          onToggle: (bool value) {
+            unawaited(_setCapsuleEnabled(value));
+          },
+          showChevron: false,
+        ),
       if (!_hidePromotedAccess)
         _buildPermissionItem(
           title: strings.liveUpdatesAccess,

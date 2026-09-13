@@ -88,35 +88,39 @@ class LbBottomNavItem extends StatelessWidget {
             shape: const StadiumBorder(),
             shadows: const <BoxShadow>[],
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              _LbAnimatedNavIcon(
-                motion: motion,
-                progress: motionProgress.clamp(0.0, 1.0),
-                child: LbIcon(
-                  symbol: emphasis >= 0.5 ? (activeIcon ?? icon) : icon,
-                  size: LbSpacing.bottomNavIconSize,
-                  color: foregroundColor,
+          child: SizedBox(
+            height: LbSpacing.bottomNavHeight -
+                (LbSpacing.bottomNavInnerPadding * 2) -
+                (LbSpacing.bottomNavItemVerticalPadding * 2),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                _LbAnimatedNavIcon(
+                  motion: motion,
+                  progress: motionProgress.clamp(0.0, 1.0),
+                  child: LbIcon(
+                    symbol: emphasis >= 0.5 ? (activeIcon ?? icon) : icon,
+                    size: LbSpacing.bottomNavIconSize,
+                    color: foregroundColor,
+                  ),
                 ),
-              ),
-              const SizedBox(height: LbSpacing.bottomNavLabelGap),
-              SizedBox(
-                width: double.infinity,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    softWrap: false,
-                    textAlign: TextAlign.center,
-                    style: LbTextStyles.navLabel.copyWith(
-                      color: foregroundColor,
+                const SizedBox(height: LbSpacing.bottomNavLabelGap),
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      softWrap: false,
+                      textAlign: TextAlign.center,
+                      style: LbTextStyles.navLabel.copyWith(
+                        color: foregroundColor,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

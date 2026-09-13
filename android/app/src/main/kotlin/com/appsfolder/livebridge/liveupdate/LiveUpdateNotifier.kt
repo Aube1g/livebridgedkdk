@@ -36,6 +36,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.appsfolder.livebridge.R
+import com.appsfolder.livebridge.liveupdate.capsule.CapsuleOverlayManager
+import com.appsfolder.livebridge.liveupdate.capsule.CapsulePayload
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -44,6 +46,12 @@ import kotlin.random.Random
 object LiveUpdateNotifier {
     const val CHANNEL_ID = "livebridge_promoted_updates"
     private const val TWO_GIS_PACKAGE = "ru.dublgis.dgismobile"
+
+    /**
+     * In-app floating capsule for API 33-35, wired by the listener service.
+     */
+    @Volatile
+    var capsuleOverlay: CapsuleOverlayManager? = null
 
     private const val CHANNEL_NAME = "LiveBridge Updates"
     private const val TAG = "LiveUpdateNotifier"
@@ -259,6 +267,7 @@ object LiveUpdateNotifier {
             userDismissedMirrorKeys.clear()
             programmaticMirrorCancelDeadlines.clear()
         }
+        capsuleOverlay?.hide()
     }
 
     fun cancelCallMirrors(context: Context): Int {
@@ -1326,6 +1335,7 @@ object LiveUpdateNotifier {
             return
         }
 
+        var noMirrorsLeft = false
         synchronized(stateLock) {
             val now = SystemClock.elapsedRealtime()
             pruneProgrammaticMirrorCancelsLocked(now)
@@ -1339,6 +1349,10 @@ object LiveUpdateNotifier {
             smartAnimationGenerations.remove(mirrorKey)
             smartAnimationStates.remove(mirrorKey)
             otpAnimationGenerations.remove(mirrorKey)
+            noMirrorsLeft = mirrorKeysByNotificationId.isEmpty()
+        }
+        if (noMirrorsLeft) {
+            capsuleOverlay?.hide()
         }
     }
 
@@ -2015,6 +2029,7 @@ object LiveUpdateNotifier {
                 manager = manager,
                 notificationId = notificationId,
                 notification = promotedNotification,
+                sbn = sbn,
                 mirrorKey = mirrorKey
             )
         } catch (error: Throwable) {
@@ -2042,6 +2057,7 @@ object LiveUpdateNotifier {
                 manager = manager,
                 notificationId = notificationId,
                 notification = fallback,
+                sbn = sbn,
                 mirrorKey = mirrorKey
             )
         }
@@ -4602,6 +4618,7 @@ object LiveUpdateNotifier {
         manager: NotificationManagerCompat,
         notificationId: Int,
         notification: Notification,
+        sbn: StatusBarNotification,
         mirrorKey: String
     ) {
         manager.notify(notificationId, notification)
@@ -4609,12 +4626,16 @@ object LiveUpdateNotifier {
             pruneProgrammaticMirrorCancelsLocked(SystemClock.elapsedRealtime())
             mirrorKeysByNotificationId[notificationId] = mirrorKey
         }
+        if (Build.VERSION.SDK_INT < 36) {
+            capsuleOverlay?.show(CapsulePayload.from(notification, sbn.packageName))
+        }
     }
 
     private fun cancelMirroredNotification(
         manager: NotificationManagerCompat,
         notificationId: Int
     ) {
+        var noMirrorsLeft = false
         synchronized(stateLock) {
             programmaticMirrorCancelDeadlines[notificationId] =
                 SystemClock.elapsedRealtime() + PROGRAMMATIC_MIRROR_CANCEL_GRACE_MS
@@ -4622,8 +4643,12 @@ object LiveUpdateNotifier {
             if (mirrorKey != null) {
                 callMirrorStates.remove(mirrorKey)
             }
+            noMirrorsLeft = mirrorKeysByNotificationId.isEmpty()
         }
         manager.cancel(notificationId)
+        if (noMirrorsLeft) {
+            capsuleOverlay?.hide()
+        }
     }
 
     private fun consumeProgrammaticMirrorCancelLocked(

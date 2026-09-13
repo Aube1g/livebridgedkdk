@@ -45,6 +45,12 @@ class LiveBridgePlatform {
       _askBool('openPromotedNotificationSettings');
   static Future<bool> openAppNotificationSettings() =>
       _askBool('openAppNotificationSettings');
+  static Future<bool> hasOverlayPermission() => _askBool('hasOverlayPermission');
+  static Future<bool> openOverlaySettings() => _askBool('openOverlaySettings');
+  static Future<bool> getCapsuleOverlayEnabled() =>
+      _askBool('getCapsuleOverlayEnabled');
+  static Future<bool> setCapsuleOverlayEnabled(bool value) =>
+      _askBool('setCapsuleOverlayEnabled', {'value': value});
   static Future<String> exportLiveBridgeSettingsBackup() =>
       _askStr('exportLiveBridgeSettingsBackup');
   static Future<String> saveLiveBridgeSettingsBackupToDownloads() =>
