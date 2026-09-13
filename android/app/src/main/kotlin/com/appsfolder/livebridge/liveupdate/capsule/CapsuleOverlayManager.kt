@@ -4,6 +4,8 @@ import android.app.Notification
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.os.Handler
+import android.os.Looper
 import android.os.Build
 import android.provider.Settings
 import android.view.Gravity
@@ -18,6 +20,7 @@ import android.widget.TextView
 import com.appsfolder.livebridge.MainActivity
 import com.appsfolder.livebridge.R
 import com.appsfolder.livebridge.liveupdate.ConverterPrefs
+import kotlin.math.abs
 
 data class CapsulePayload(
     val title: String,
@@ -69,9 +72,41 @@ class CapsuleOverlayManager(appContext: Context) {
     private val windowManager =
         context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
+    private val positionHandler = Handler(Looper.getMainLooper())
     private var view: View? = null
+    private var wmParams: WindowManager.LayoutParams? = null
     private var lastPayload: CapsulePayload? = null
     private var suppressedKey: String? = null
+    private var isDragging = false
+    private var isLongPressDragging = false
+    private var longPressPending = false
+    private var grabOffsetX = 0
+    private var grabOffsetY = 0
+    private var downX = 0f
+    private var downY = 0f
+    private var lastX = 0f
+    private var lastY = 0f
+
+    private val longPressRunnable = Runnable {
+        longPressPending = false
+        isLongPressDragging = true
+        val v = view ?: return@Runnable
+        val params = wmParams ?: return@Runnable
+        if (params.gravity and Gravity.CENTER_HORIZONTAL != 0) {
+            val loc = IntArray(2)
+            v.getLocationOnScreen(loc)
+            params.gravity = Gravity.TOP or Gravity.START
+            params.x = loc[0]
+            params.y = loc[1]
+            try {
+                windowManager.updateViewLayout(v, params)
+            } catch (error: Throwable) {
+                // keep the previous layout
+            }
+        }
+        grabOffsetX = (lastX - params.x).toInt()
+        grabOffsetY = (lastY - params.y).toInt()
+    }
 
     fun show(payload: CapsulePayload) {
         val skip = showSkipReason(payload)
@@ -82,19 +117,29 @@ class CapsuleOverlayManager(appContext: Context) {
         }
         lastPayload = payload
         var target = view
-        if (target == null) {
+        val isNew = target == null
+        if (isNew) {
             val created = buildView()
+            val params = createLayoutParams()
             try {
-                windowManager.addView(created, createLayoutParams())
+                windowManager.addView(created, params)
             } catch (error: Throwable) {
                 Log.w(TAG, "addView failed", error)
                 return
             }
+            wmParams = params
             view = created
             target = created
             Log.d(TAG, "capsule shown: ${payload.packageName} | ${payload.title}")
         }
         bindView(target, payload)
+        if (isNew) {
+            target?.let { pill ->
+                pill.alpha = 0f
+                pill.translationY = -dp(20f).toFloat()
+                pill.animate().alpha(1f).translationY(0f).setDuration(220).start()
+            }
+        }
     }
 
     /** The conversion ended; the capsule is gone until a new one arrives. */
@@ -118,6 +163,7 @@ class CapsuleOverlayManager(appContext: Context) {
     }
 
     fun release() {
+        positionHandler.removeCallbacksAndMessages(null)
         hide()
     }
 
@@ -183,50 +229,104 @@ class CapsuleOverlayManager(appContext: Context) {
             progress.visibility = View.GONE
         }
 
-        root.alpha = 1f
-        root.translationY = 0f
+        if (!isDragging && !isLongPressDragging) {
+            root.alpha = 1f
+            root.translationY = 0f
+        }
     }
 
     private fun attachInteractions(root: View) {
         val dismissThresholdPx = dp(48f).toFloat()
         val dragStartPx = dp(12f).toFloat()
         val maxTranslationPx = dp(96f).toFloat()
-        var downY = 0f
-        var dragging = false
         root.setOnTouchListener { v, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    downX = event.rawX
                     downY = event.rawY
-                    dragging = false
+                    lastX = event.rawX
+                    lastY = event.rawY
+                    isDragging = false
+                    isLongPressDragging = false
+                    longPressPending = true
+                    positionHandler.removeCallbacks(longPressRunnable)
+                    positionHandler.postDelayed(longPressRunnable, 450L)
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    val delta = event.rawY - downY
-                    if (delta > dragStartPx) {
-                        dragging = true
+                    lastX = event.rawX
+                    lastY = event.rawY
+                    val dx = event.rawX - downX
+                    val dy = event.rawY - downY
+                    if (longPressPending && (abs(dx) > dragStartPx || abs(dy) > dragStartPx)) {
+                        longPressPending = false
+                        positionHandler.removeCallbacks(longPressRunnable)
                     }
-                    if (dragging) {
-                        v.alpha = (1f - delta / dismissThresholdPx).coerceIn(0.08f, 1f)
-                        v.translationY = (delta * 0.35f).coerceAtMost(maxTranslationPx)
+                    if (isLongPressDragging) {
+                        moveWindow((lastX - grabOffsetX).toInt(), (lastY - grabOffsetY).toInt())
+                    } else {
+                        if (dy > dragStartPx) {
+                            isDragging = true
+                        }
+                        if (isDragging) {
+                            v.alpha = (1f - dy / dismissThresholdPx).coerceIn(0.08f, 1f)
+                            v.translationY = (dy * 0.35f).coerceAtMost(maxTranslationPx)
+                        }
                     }
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (dragging && event.rawY - downY > dismissThresholdPx) {
-                        dismissed()
-                    } else if (!dragging) {
-                        v.animate().alpha(1f).translationY(0f).setDuration(120).start()
-                        openApp()
+                    positionHandler.removeCallbacks(longPressRunnable)
+                    longPressPending = false
+                    when {
+                        isLongPressDragging -> {
+                            isLongPressDragging = false
+                            persistWindowPosition()
+                        }
+                        isDragging && event.rawY - downY > dismissThresholdPx -> {
+                            dismissed()
+                        }
+                        else -> {
+                            v.animate().alpha(1f).translationY(0f).setDuration(120).start()
+                            if (!isDragging) {
+                                openApp()
+                            }
+                        }
                     }
+                    isDragging = false
                     true
                 }
                 MotionEvent.ACTION_CANCEL -> {
+                    positionHandler.removeCallbacks(longPressRunnable)
+                    longPressPending = false
+                    isDragging = false
+                    isLongPressDragging = false
                     v.animate().alpha(1f).translationY(0f).setDuration(120).start()
                     true
                 }
                 else -> false
             }
         }
+    }
+
+    private fun moveWindow(xPx: Int, yPx: Int) {
+        val v = view ?: return
+        val params = wmParams ?: return
+        val metrics = context.resources.displayMetrics
+        params.x = xPx.coerceIn(0, (metrics.widthPixels - v.width).coerceAtLeast(0))
+        params.y = yPx.coerceIn(0, metrics.heightPixels - v.height)
+        try {
+            windowManager.updateViewLayout(v, params)
+        } catch (error: Throwable) {
+            Log.w(TAG, "updateViewLayout failed", error)
+        }
+    }
+
+    private fun persistWindowPosition() {
+        val params = wmParams ?: return
+        val prefs = ConverterPrefs(context)
+        prefs.setCapsulePositionX(params.x)
+        prefs.setCapsulePositionY(params.y)
     }
 
     private fun dismissed() {
@@ -279,8 +379,18 @@ class CapsuleOverlayManager(appContext: Context) {
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         )
-        params.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-        params.y = statusBarHeightPx() + dp(6f)
+        val prefs = ConverterPrefs(context)
+        val savedX = prefs.getCapsulePositionX()
+        val savedY = prefs.getCapsulePositionY()
+        if (savedX >= 0 && savedY >= 0) {
+            params.gravity = Gravity.TOP or Gravity.START
+            val metrics = context.resources.displayMetrics
+            params.x = savedX.coerceIn(0, (metrics.widthPixels - dp(80)).coerceAtLeast(0))
+            params.y = savedY.coerceIn(0, (metrics.heightPixels - dp(60)).coerceAtLeast(0))
+        } else {
+            params.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            params.y = statusBarHeightPx() + dp(6f)
+        }
         return params
     }
 
