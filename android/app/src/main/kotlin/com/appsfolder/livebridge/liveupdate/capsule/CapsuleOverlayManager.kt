@@ -3,11 +3,14 @@ package com.appsfolder.livebridge.liveupdate.capsule
 import android.app.Notification
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.PixelFormat
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.os.Build
+import android.os.SystemClock
 import android.provider.Settings
+import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -15,19 +18,28 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.ProgressBar
-import android.util.Log
 import android.widget.TextView
 import com.appsfolder.livebridge.MainActivity
 import com.appsfolder.livebridge.R
 import com.appsfolder.livebridge.liveupdate.ConverterPrefs
 import kotlin.math.abs
 
+enum class CapsuleKind {
+    GENERIC,
+    OTP,
+    PROGRESS,
+    PASSWORD,
+    VPN,
+    SPEED
+}
+
 data class CapsulePayload(
     val title: String,
     val text: String,
     val packageName: String,
     val progress: Int,
-    val progressMax: Int
+    val progressMax: Int,
+    val kind: CapsuleKind
 ) {
     val suppressKey: String
         get() = "$packageName|$title"
@@ -47,22 +59,58 @@ data class CapsulePayload(
             } else {
                 extras.getInt(Notification.EXTRA_PROGRESS, 0)
             }
+            val combined = "$title $text"
+            val kind = when {
+                progressMax > 0 && !indeterminate -> CapsuleKind.PROGRESS
+                hasCopyAction(notification) -> CapsuleKind.OTP
+                PASSWORD_REGEX.containsMatchIn(combined) -> CapsuleKind.PASSWORD
+                VPN_REGEX.containsMatchIn(combined) -> CapsuleKind.VPN
+                else -> CapsuleKind.GENERIC
+            }
             return CapsulePayload(
                 title = title,
                 text = text,
                 packageName = packageName,
                 progress = progress,
-                progressMax = progressMax
+                progressMax = progressMax,
+                kind = kind
             )
         }
+
+        fun speed(packageName: String, speedText: String): CapsulePayload {
+            return CapsulePayload(
+                title = "",
+                text = speedText,
+                packageName = packageName,
+                progress = 0,
+                progressMax = 0,
+                kind = CapsuleKind.SPEED
+            )
+        }
+
+        private fun hasCopyAction(notification: Notification): Boolean {
+            val actions = notification.actions ?: return false
+            return actions.any { action ->
+                COPY_ACTION_REGEX.containsMatchIn(action.title?.toString().orEmpty())
+            }
+        }
+
+        private val PASSWORD_REGEX = Regex("(парол|password)", RegexOption.IGNORE_CASE)
+        private val VPN_REGEX = Regex("\\bvpn\\b", RegexOption.IGNORE_CASE)
+        private val COPY_ACTION_REGEX =
+            Regex("copy|скопир|копир|kopyla|копира", RegexOption.IGNORE_CASE)
     }
 }
 
 /**
  * Renders the in-app "capsule" — an island-style floating pill drawn above
- * other apps for converted notifications. Used on API 33–35, where the OS
- * Live Updates island surface is unavailable; on API 36+ the native island is
- * used instead.
+ * other apps. Used on API 33–35, where the OS Live Updates island surface is
+ * unavailable; on API 36+ the native island is used instead.
+ *
+ * Two sources feed the pill:
+ *  - converted notifications (mirrors) — always take priority;
+ *  - the network speed foreground service — a persistent, self-updating pill
+ *    shown while no conversion is active.
  *
  * The overlay view is owned by the notification listener service, so it
  * lives and dies together with the app process.
@@ -71,12 +119,16 @@ class CapsuleOverlayManager(appContext: Context) {
     private val context: Context = appContext.applicationContext
     private val windowManager =
         context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-
     private val positionHandler = Handler(Looper.getMainLooper())
+
     private var view: View? = null
     private var wmParams: WindowManager.LayoutParams? = null
     private var lastPayload: CapsulePayload? = null
+    private var lastSpeed: CapsulePayload? = null
+    private var activeKind: CapsuleKind? = null
     private var suppressedKey: String? = null
+    private var speedMutedUntilMs = 0L
+    private var boundText = ""
     private var isDragging = false
     private var isLongPressDragging = false
     private var longPressPending = false
@@ -108,6 +160,7 @@ class CapsuleOverlayManager(appContext: Context) {
         grabOffsetY = (lastY - params.y).toInt()
     }
 
+    /** A conversion (mirror) is active — the pill takes priority. */
     fun show(payload: CapsulePayload) {
         val skip = showSkipReason(payload)
         if (skip != null) {
@@ -116,6 +169,72 @@ class CapsuleOverlayManager(appContext: Context) {
             return
         }
         lastPayload = payload
+        render(payload)
+    }
+
+    /** Network speed tick from the FGS — shown while no conversion is active. */
+    fun showSpeed(speedText: String) {
+        if (SystemClock.elapsedRealtime() < speedMutedUntilMs) {
+            lastSpeed = null
+            return
+        }
+        val payload = CapsulePayload.speed(context.packageName, speedText)
+        lastSpeed = payload
+        if (lastPayload == null) {
+            render(payload)
+        }
+    }
+
+    fun clearSpeed() {
+        lastSpeed = null
+        if (activeKind == CapsuleKind.SPEED) {
+            Log.d(TAG, "speed pill cleared")
+            removeView()
+        }
+    }
+
+    /** The conversion ended; fall back to the speed pill if it is live. */
+    fun hide() {
+        lastPayload = null
+        suppressedKey = null
+        val speed = lastSpeed
+        if (speed != null) {
+            render(speed)
+        } else {
+            removeView()
+        }
+    }
+
+    /** Keeps the payload but hides the pill while LiveBridge is on screen. */
+    fun suspendWhileAppVisible() {
+        if (lastPayload != null || lastSpeed != null) {
+            removeView()
+        }
+    }
+
+    /** Re-shows the pill if a source is still active. */
+    fun resumeIfActive() {
+        val payload = lastPayload
+        if (payload != null) {
+            show(payload)
+            return
+        }
+        val speed = lastSpeed ?: return
+        render(speed)
+    }
+
+    fun release() {
+        positionHandler.removeCallbacksAndMessages(null)
+        hide()
+    }
+
+    private fun render(payload: CapsulePayload) {
+        val skip = showSkipReason(payload)
+        if (skip != null) {
+            Log.d(TAG, "render skipped ($skip): ${payload.kind}")
+            removeView()
+            return
+        }
         var target = view
         val isNew = target == null
         if (isNew) {
@@ -130,41 +249,35 @@ class CapsuleOverlayManager(appContext: Context) {
             wmParams = params
             view = created
             target = created
-            Log.d(TAG, "capsule shown: ${payload.packageName} | ${payload.title}")
+            Log.d(TAG, "capsule shown: ${payload.kind} | ${payload.packageName}")
         }
+        val previousText = boundText
         bindView(target, payload)
+        activeKind = payload.kind
         if (isNew) {
             target?.let { pill ->
                 pill.alpha = 0f
                 pill.translationY = -dp(20f).toFloat()
                 pill.animate().alpha(1f).translationY(0f).setDuration(220).start()
+                if (payload.kind == CapsuleKind.OTP) {
+                    pill.animate()
+                        .scaleX(1.05f)
+                        .scaleY(1.05f)
+                        .setDuration(140)
+                        .withEndAction {
+                            pill.animate().scaleX(1f).scaleY(1f).setDuration(220).start()
+                        }
+                        .start()
+                }
             }
+        } else if (boundText != previousText && boundText.isNotEmpty()) {
+            // Content changed in place (speed tick, code refresh, ...) — crossfade.
+            target?.animate()?.alpha(0.45f)?.setDuration(60)
+                ?.withEndAction {
+                    target?.animate()?.alpha(1f)?.setDuration(160)?.start()
+                }
+                ?.start()
         }
-    }
-
-    /** The conversion ended; the capsule is gone until a new one arrives. */
-    fun hide() {
-        lastPayload = null
-        suppressedKey = null
-        removeView()
-    }
-
-    /** Keeps the payload but hides the pill while LiveBridge is on screen. */
-    fun suspendWhileAppVisible() {
-        if (lastPayload != null) {
-            removeView()
-        }
-    }
-
-    /** Re-shows the pill if the conversion is still active. */
-    fun resumeIfActive() {
-        val payload = lastPayload ?: return
-        show(payload)
-    }
-
-    fun release() {
-        positionHandler.removeCallbacksAndMessages(null)
-        hide()
     }
 
     private fun showSkipReason(payload: CapsulePayload): String? {
@@ -213,15 +326,79 @@ class CapsuleOverlayManager(appContext: Context) {
             icon.visibility = View.GONE
         }
 
-        title.text = payload.title
-        if (payload.text.isEmpty()) {
-            text.visibility = View.GONE
-        } else {
-            text.visibility = View.VISIBLE
-            text.text = payload.text
+        when (payload.kind) {
+            CapsuleKind.SPEED -> {
+                title.visibility = View.GONE
+                title.text = ""
+                text.visibility = View.VISIBLE
+                text.text = payload.text
+                text.setTextSize(13f)
+                text.letterSpacing = 0.02f
+                text.setTypeface(null, android.graphics.Typeface.NORMAL)
+                text.setTextColor(Color.parseColor("#CBB4FF"))
+            }
+            CapsuleKind.OTP -> {
+                title.visibility = if (payload.title.isEmpty()) {
+                    View.GONE
+                } else {
+                    View.VISIBLE
+                }
+                title.text = payload.title
+                title.setTextSize(11f)
+                title.setTextColor(Color.parseColor("#9B9B9B"))
+                text.visibility = View.VISIBLE
+                text.text = payload.text
+                text.setTextSize(15f)
+                text.letterSpacing = 0.12f
+                text.setTypeface(null, android.graphics.Typeface.BOLD)
+                text.setTextColor(Color.parseColor("#B79CFF"))
+            }
+            CapsuleKind.PASSWORD -> {
+                title.visibility = View.VISIBLE
+                title.text = payload.title
+                title.setTextSize(13f)
+                title.setTextColor(Color.parseColor("#FFFFFF"))
+                text.visibility = if (payload.text.isEmpty()) {
+                    View.GONE
+                } else {
+                    View.VISIBLE
+                }
+                text.text = payload.text
+                text.setTextSize(11.5f)
+                text.setTextColor(Color.parseColor("#FF8A80"))
+            }
+            CapsuleKind.VPN -> {
+                title.visibility = View.VISIBLE
+                title.text = payload.title
+                title.setTextSize(13f)
+                title.setTextColor(Color.parseColor("#FFFFFF"))
+                text.visibility = if (payload.text.isEmpty()) {
+                    View.GONE
+                } else {
+                    View.VISIBLE
+                }
+                text.text = payload.text
+                text.setTextSize(11.5f)
+                text.setTextColor(Color.parseColor("#CBB4FF"))
+            }
+            else -> {
+                title.visibility = View.VISIBLE
+                title.text = payload.title
+                title.setTextSize(13f)
+                title.setTextColor(Color.parseColor("#FFFFFF"))
+                text.visibility = if (payload.text.isEmpty()) {
+                    View.GONE
+                } else {
+                    View.VISIBLE
+                }
+                text.text = payload.text
+                text.setTextSize(11.5f)
+                text.setTextColor(Color.parseColor("#B3FFFFFF"))
+            }
         }
+        boundText = payload.text
 
-        if (payload.progressMax > 0 && !payload.text.isEmpty()) {
+        if (payload.kind == CapsuleKind.PROGRESS) {
             progress.max = payload.progressMax
             progress.progress = payload.progress
             progress.visibility = View.VISIBLE
@@ -330,6 +507,13 @@ class CapsuleOverlayManager(appContext: Context) {
     }
 
     private fun dismissed() {
+        if (activeKind == CapsuleKind.SPEED) {
+            // Swiping the speed pill away mutes it for a minute.
+            speedMutedUntilMs = SystemClock.elapsedRealtime() + 60_000L
+            lastSpeed = null
+            removeView()
+            return
+        }
         lastPayload?.let { suppressedKey = it.suppressKey }
         view?.let { pill ->
             pill.animate()
@@ -367,6 +551,9 @@ class CapsuleOverlayManager(appContext: Context) {
             }
         }
         view = null
+        wmParams = null
+        activeKind = null
+        boundText = ""
     }
 
     private fun createLayoutParams(): WindowManager.LayoutParams {

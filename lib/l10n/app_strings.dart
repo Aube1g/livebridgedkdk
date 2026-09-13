@@ -1664,6 +1664,86 @@ class AppStrings {
         '시도하거나 업무 프로필을 제거해 보세요.',
   );
 
+  String get forkByTitle => tr(
+    en: 'Fork by Aubeig',
+    ru: 'Форк от Aubeig',
+    tr: 'Aubeig fork\'u',
+    ptBr: 'Fork de Aubeig',
+    zhHans: 'Aubeig 的分支',
+    zhHant: 'Aubeig 的分支',
+    ko: 'Aubeig 포크',
+  );
+
+  String get welcomeTitle => tr(
+    en: 'Welcome to LiveBridge',
+    ru: 'Добро пожаловать в LiveBridge',
+    tr: 'LiveBridge\'a hoş geldin',
+    ptBr: 'Bem-vindo ao LiveBridge',
+    zhHans: '欢迎使用 LiveBridge',
+    zhHant: '歡迎使用 LiveBridge',
+    ko: 'LiveBridge에 오신 것을 환영합니다',
+  );
+
+  String get welcomeSubtitle => tr(
+    en: 'A fork by Aubeig — built for Android 13+',
+    ru: 'Форк Aubeig — собран для Android 13+',
+    tr: 'Aubeig fork\'u — Android 13+ için yapıldı',
+    ptBr: 'Um fork de Aubeig — feito para Android 13+',
+    zhHans: 'Aubeig 的分支 — 专为 Android 13+ 打造',
+    zhHant: 'Aubeig 的分支 — 專為 Android 13+ 打造',
+    ko: 'Aubeig 포크 — Android 13+용',
+  );
+
+  String get welcomeAction => tr(
+    en: 'Let\'s go',
+    ru: 'Поехали',
+    tr: 'Hadi gidelim',
+    ptBr: 'Vamos lá',
+    zhHans: '开始吧',
+    zhHant: '開始吧',
+    ko: '시작하기',
+  );
+
+  String get adbHelpTitle => tr(
+    en: 'Grant access via ADB',
+    ru: 'Выдать доступ через ADB',
+    tr: 'ADB ile erişim ver',
+    ptBr: 'Conceder acesso via ADB',
+    zhHans: '通过 ADB 授权',
+    zhHant: '透過 ADB 授權',
+    ko: 'ADB로 권한 부여',
+  );
+
+  String get adbHelpDescription => tr(
+    en: 'If the system dialog is blocked or missing',
+    ru: 'Если системный диалог не работает',
+    tr: 'Sistem onayı engellenmişse',
+    ptBr: 'Se o diálogo do sistema não funcionar',
+    zhHans: '如果系统弹窗被拦截或不存在',
+    zhHant: '如果系統彈窗被攔截或不存在',
+    ko: '시스템 다이얼로그가 차단된 경우',
+  );
+
+  String get adbCopied => tr(
+    en: 'Command copied',
+    ru: 'Команда скопирована',
+    tr: 'Komut kopyalandı',
+    ptBr: 'Comando copiado',
+    zhHans: '命令已复制',
+    zhHant: '命令已複製',
+    ko: '명령이 복사되었습니다',
+  );
+
+  String get copyAction => tr(
+    en: 'Copy',
+    ru: 'Скопировать',
+    tr: 'Kopyala',
+    ptBr: 'Copiar',
+    zhHans: '复制',
+    zhHant: '複製',
+    ko: '복사',
+  );
+
   String get madeByTitle => tr(
     en: 'Made by Aubeig',
     ru: 'Сделано Aubeig',

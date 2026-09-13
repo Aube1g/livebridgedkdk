@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../models/app_models.dart';
@@ -11,6 +12,9 @@ import '../../widgets/redesign/lb_detail_screen.dart';
 import '../../widgets/redesign/lb_icon.dart';
 import '../../widgets/redesign/lb_list_component.dart';
 import '../../widgets/redesign/lb_toast.dart';
+
+const String _adbAllowListenerCommand =
+    'adb shell cmd notification allow_listener com.appsfolder.livebridge/.liveupdate.LiveUpdateNotificationListenerService';
 
 class SettingsPermissionsScreen extends StatefulWidget {
   const SettingsPermissionsScreen({super.key});
@@ -127,6 +131,63 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
     _snack(AppStrings.of(context).notificationsUnavailable);
   }
 
+  Future<void> _showAdbHelpSheet() async {
+    final AppStrings strings = AppStrings.of(context);
+    final LbPalette palette = LbPalette.of(context);
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: palette.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: Text(
+            strings.adbHelpTitle,
+            style: LbTextStyles.cardTitle.copyWith(
+              color: palette.textPrimary,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: palette.surfaceSoft,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: SelectableText(
+                  _adbAllowListenerCommand,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    height: 1.4,
+                    color: Color(0xFFCBB4FF),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(
+                  const ClipboardData(text: _adbAllowListenerCommand),
+                );
+                Navigator.of(dialogContext).pop();
+                _snack(strings.adbCopied);
+              },
+              child: Text(strings.copyAction),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _setCapsuleEnabled(bool value) async {
     if (value) {
       if (!_overlayGranted) {
@@ -225,6 +286,14 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
             unawaited(_openPromotedSettings());
           },
         ),
+      LbListItemData(
+        title: strings.adbHelpTitle,
+        description: strings.adbHelpDescription,
+        onTap: () {
+          unawaited(LiveBridgeHaptics.selection());
+          unawaited(_showAdbHelpSheet());
+        },
+      ),
     ];
 
     return LbDetailScreen(

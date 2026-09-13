@@ -6,9 +6,9 @@ class LbColors {
 
   static const Color white = Color(0xFFFFFFFF);
   static const Color link = Color(0xFF5D70FF);
-  static const Color accent = Color(0xFFA78BFA);
-  static const Color accentLight = Color(0xFFBBA4FF);
-  static const Color toggleActive = Color(0xFF8B5CF6);
+  static const Color accent = Color(0xFFB79CFF);
+  static const Color accentLight = Color(0xFFCBB4FF);
+  static const Color toggleActive = Color(0xFF9D7BF5);
   static const Color toggleInactive = Color(0xFFA0A0A0);
   static const Color warning = Color(0xFFBD7B7B);
 }
@@ -76,10 +76,10 @@ class LbPalette {
   final Color thumbBorder;
 
   static const LbPalette dark = LbPalette(
-    background: Color(0xFF120F1D),
-    surface: Color(0xFF1F1B31),
-    surfaceSoft: Color(0xFF221E35),
-    surfaceRaised: Color(0xFF282341),
+    background: Color(0xFF131020),
+    surface: Color(0xFF201B33),
+    surfaceSoft: Color(0xFF241F38),
+    surfaceRaised: Color(0xFF2A2442),
     pressedOverlay: Color(0x26000000),
     warningSurface: Color(0xFF261C1C),
     textPrimary: Color(0xFFF3F6F4),
@@ -87,15 +87,15 @@ class LbPalette {
     textMuted: Color(0xFF7D8784),
     accent: LbColors.accent,
     accentStrong: LbColors.accent,
-    navForegroundActive: Color(0xFFBBA4FF),
-    navForegroundInactive: Color(0xFFBBA4FF),
+    navForegroundActive: Color(0xFFCBB4FF),
+    navForegroundInactive: Color(0xFFCBB4FF),
     toggleTrackActive: LbColors.toggleActive,
     toggleTrackInactive: LbColors.toggleInactive,
     toggleThumb: LbColors.white,
     divider: Color(0x14FFFFFF),
     navBorder: Color(0x1AFFFFFF),
-    navBlurTint: Color(0xD91F1B31),
-    navActiveFill: Color(0x52A78BFA),
+    navBlurTint: Color(0xD9201B33),
+    navActiveFill: Color(0x52B79CFF),
     recentSeparator: Color(0xFF313131),
     chevron: Color(0xFF505050),
     link: LbColors.link,
@@ -107,9 +107,9 @@ class LbPalette {
   );
 
   static const LbPalette light = LbPalette(
-    background: Color(0xFFF7F5FC),
+    background: Color(0xFFF8F6FD),
     surface: Color(0xFFFFFFFF),
-    surfaceSoft: Color(0xFFF1EDF9),
+    surfaceSoft: Color(0xFFF2EEFA),
     surfaceRaised: Color(0xFFFFFFFF),
     pressedOverlay: Color(0x12000000),
     warningSurface: Color(0xFFF7ECEC),
@@ -118,15 +118,15 @@ class LbPalette {
     textMuted: Color(0xFFC4C4C4),
     accent: LbColors.accent,
     accentStrong: LbColors.accent,
-    navForegroundActive: Color(0xFF7C5CE0),
-    navForegroundInactive: Color(0xFF4A3F66),
+    navForegroundActive: Color(0xFF8B6FE8),
+    navForegroundInactive: Color(0xFF4E4370),
     toggleTrackActive: LbColors.toggleActive,
     toggleTrackInactive: LbColors.toggleInactive,
     toggleThumb: LbColors.white,
     divider: Color(0xFFEFEFEF),
-    navBorder: Color(0x1A4A3F66),
+    navBorder: Color(0x1A4E4370),
     navBlurTint: Color(0xD9FFFFFF),
-    navActiveFill: Color(0x66A78BFA),
+    navActiveFill: Color(0x66B79CFF),
     recentSeparator: Color(0xFFEFEFEF),
     chevron: Color(0xFFC4C4C4),
     link: LbColors.link,
@@ -161,7 +161,7 @@ class LbAppTheme {
 
     return ThemeData(
       brightness: brightness,
-      useMaterial3: false,
+      useMaterial3: true,
       fontFamily: LbTextStyles.fontFamily,
       splashFactory: NoSplash.splashFactory,
       highlightColor: Colors.transparent,

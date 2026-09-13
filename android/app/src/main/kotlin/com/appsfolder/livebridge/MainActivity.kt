@@ -119,6 +119,11 @@ class MainActivity : FlutterActivity() {
                 prefs.setCapsuleOverlayEnabled(call.argument<Boolean>("value") ?: true)
                 res.success(true)
             }
+            "getWelcomeV2Shown" -> res.success(prefs.getWelcomeV2Shown())
+            "setWelcomeV2Shown" -> {
+                prefs.setWelcomeV2Shown(call.argument<Boolean>("value") ?: true)
+                res.success(true)
+            }
             "getInstalledApps" -> loadInstalledAppsAsync(res)
             "getDeviceInfo" -> res.success(getDeviceInfo())
             "exportLiveBridgeSettingsBackup" -> res.success(prefs.exportSettingsBackupJson())
