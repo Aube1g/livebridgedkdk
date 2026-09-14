@@ -45,6 +45,17 @@ class LiveBridgePlatform {
       _askBool('openPromotedNotificationSettings');
   static Future<bool> openAppNotificationSettings() =>
       _askBool('openAppNotificationSettings');
+  static Future<bool> hasOverlayPermission() => _askBool('hasOverlayPermission');
+  static Future<bool> openOverlaySettings() => _askBool('openOverlaySettings');
+  static Future<bool> getCapsuleOverlayEnabled() =>
+      _askBool('getCapsuleOverlayEnabled');
+  static Future<bool> setCapsuleOverlayEnabled(bool value) =>
+      _askBool('setCapsuleOverlayEnabled', {'value': value});
+  static Future<bool> getWelcomeV2Shown() => _askBool('getWelcomeV2Shown');
+  static Future<bool> setCapsulePositionPreset(String preset) =>
+      _askBool('setCapsulePositionPreset', {'value': preset});
+  static Future<bool> setWelcomeV2Shown(bool value) =>
+      _askBool('setWelcomeV2Shown', {'value': value});
   static Future<String> exportLiveBridgeSettingsBackup() =>
       _askStr('exportLiveBridgeSettingsBackup');
   static Future<String> saveLiveBridgeSettingsBackupToDownloads() =>
@@ -373,7 +384,12 @@ class LiveBridgePlatform {
     final Map<String, dynamic> m = res == null
         ? const <String, dynamic>{}
         : Map<String, dynamic>.from(res);
+    final Object? rawSdkInt = m['sdkInt'];
+    final int sdkInt = rawSdkInt is int
+        ? rawSdkInt
+        : int.tryParse(rawSdkInt?.toString() ?? '') ?? 0;
     return DeviceInfo(
+      sdkInt: sdkInt,
       manufacturer: (m['manufacturer'] as String?) ?? '',
       brand: (m['brand'] as String?) ?? '',
       marketName:

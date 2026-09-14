@@ -12,6 +12,7 @@ import android.os.Looper
 import android.os.SystemClock
 import androidx.core.app.NotificationManagerCompat
 import com.appsfolder.livebridge.liveupdate.ConverterPrefs
+import com.appsfolder.livebridge.liveupdate.LiveUpdateNotifier
 
 class NetworkSpeedForegroundService : Service() {
     private lateinit var prefs: ConverterPrefs
@@ -93,6 +94,7 @@ class NetworkSpeedForegroundService : Service() {
         workerHandler = null
         workerThread = null
         notificationManager.cancel(NOTIFICATION_ID)
+        mainHandler.post { LiveUpdateNotifier.capsuleOverlay?.clearSpeed() }
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
@@ -123,6 +125,22 @@ class NetworkSpeedForegroundService : Service() {
             NOTIFICATION_ID,
             buildCurrentNotification()
         )
+        mainHandler.post {
+            val sample = latestSample
+            if (
+                sample.downloadBytesPerSecond > 0L ||
+                sample.uploadBytesPerSecond > 0L
+            ) {
+                val speedText = NetworkSpeedFormatter.formatCompact(
+                    sample.downloadBytesPerSecond
+                ) +
+                    "\u2193  " +
+                    NetworkSpeedFormatter.formatCompact(
+                        sample.uploadBytesPerSecond
+                    ) + " \u2191"
+                LiveUpdateNotifier.capsuleOverlay?.showSpeed(speedText)
+            }
+        }
     }
 
     private fun buildCurrentNotification(): Notification {

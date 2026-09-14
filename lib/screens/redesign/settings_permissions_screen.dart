@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../models/app_models.dart';
@@ -11,6 +12,9 @@ import '../../widgets/redesign/lb_detail_screen.dart';
 import '../../widgets/redesign/lb_icon.dart';
 import '../../widgets/redesign/lb_list_component.dart';
 import '../../widgets/redesign/lb_toast.dart';
+
+const String _adbAllowListenerCommand =
+    'adb shell cmd notification allow_listener com.appsfolder.livebridge/.liveupdate.LiveUpdateNotificationListenerService';
 
 class SettingsPermissionsScreen extends StatefulWidget {
   const SettingsPermissionsScreen({super.key});
@@ -26,6 +30,17 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
   bool _notificationsGranted = false;
   bool _canPostPromoted = false;
   bool _hidePromotedAccess = false;
+  int _androidSdkInt = 0;
+  bool _overlayGranted = false;
+  bool _capsulePrefEnabled = true;
+
+  bool get _liveUpdatesUnavailableOnOs =>
+      _androidSdkInt > 0 &&
+      _androidSdkInt < DeviceInfo.liveUpdatesMinimumSdkInt;
+
+  bool get _capsuleRowVisible =>
+      _androidSdkInt == 0 ||
+      _androidSdkInt < DeviceInfo.liveUpdatesMinimumSdkInt;
 
   @override
   void initState() {
@@ -64,6 +79,9 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
           await LiveBridgePlatform.isNotificationPermissionGranted();
       final bool canPostPromoted =
           await LiveBridgePlatform.canPostPromotedNotifications();
+      final bool overlayGranted = await LiveBridgePlatform.hasOverlayPermission();
+      final bool capsulePrefEnabled =
+          await LiveBridgePlatform.getCapsuleOverlayEnabled();
       final DeviceInfo deviceInfo = await LiveBridgePlatform.getDeviceInfo();
 
       if (!mounted) {
@@ -75,6 +93,9 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
         _notificationsGranted = notificationsGranted;
         _canPostPromoted = canPostPromoted;
         _hidePromotedAccess = deviceInfo.shouldHideLiveUpdatesPromotion;
+        _androidSdkInt = deviceInfo.sdkInt;
+        _overlayGranted = overlayGranted;
+        _capsulePrefEnabled = capsulePrefEnabled;
       });
     } catch (_) {}
   }
@@ -110,8 +131,130 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
     _snack(AppStrings.of(context).notificationsUnavailable);
   }
 
+  Future<void> _showCapsulePositionDialog() async {
+    final AppStrings strings = AppStrings.of(context);
+    final LbPalette palette = LbPalette.of(context);
+    final List<Widget> options = <Widget>[
+      for (MapEntry<String, String> option in <MapEntry<String, String>>[
+        MapEntry<String, String>('left', strings.capsulePositionLeft),
+        MapEntry<String, String>('center', strings.capsulePositionCenter),
+        MapEntry<String, String>('right', strings.capsulePositionRight),
+      ])
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            unawaited(LiveBridgePlatform.setCapsulePositionPreset(option.key));
+          },
+          child: Text(
+            option.value,
+            style: TextStyle(color: palette.textPrimary),
+          ),
+        ),
+    ];
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: palette.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: Text(
+            strings.capsulePositionTitle,
+            style: LbTextStyles.cardTitle.copyWith(
+              color: palette.textPrimary,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: options,
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showAdbHelpSheet() async {
+    final AppStrings strings = AppStrings.of(context);
+    final LbPalette palette = LbPalette.of(context);
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: palette.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: Text(
+            strings.adbHelpTitle,
+            style: LbTextStyles.cardTitle.copyWith(
+              color: palette.textPrimary,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: palette.surfaceSoft,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: SelectableText(
+                  _adbAllowListenerCommand,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    height: 1.4,
+                    color: Color(0xFFCBB4FF),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(
+                  const ClipboardData(text: _adbAllowListenerCommand),
+                );
+                Navigator.of(dialogContext).pop();
+                _snack(strings.adbCopied);
+              },
+              child: Text(strings.copyAction),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _setCapsuleEnabled(bool value) async {
+    if (value) {
+      if (!_overlayGranted) {
+        unawaited(LiveBridgeHaptics.openSurface());
+        final bool opened = await LiveBridgePlatform.openOverlaySettings();
+        if (!mounted || opened) {
+          return;
+        }
+        _snack(AppStrings.of(context).overlayUnavailable);
+        return;
+      }
+      await LiveBridgePlatform.setCapsuleOverlayEnabled(true);
+    } else {
+      await LiveBridgePlatform.setCapsuleOverlayEnabled(false);
+    }
+    await _loadState();
+  }
+
   Future<void> _openPromotedSettings() async {
     unawaited(LiveBridgeHaptics.openSurface());
+    if (_liveUpdatesUnavailableOnOs) {
+      _snack(AppStrings.of(context).liveUpdatesOsUnavailable);
+      return;
+    }
     final bool opened =
         await LiveBridgePlatform.openPromotedNotificationSettings();
     if (!mounted || opened) {
@@ -124,11 +267,20 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
     required String title,
     required bool enabled,
     required VoidCallback onTap,
+    bool unavailable = false,
+    String? description,
   }) {
     return LbListItemData(
       title: title,
-      trailingIcon: enabled ? null : LbIconSymbol.alertOctagonFilled,
-      trailingIconColor: enabled ? null : LbPalette.of(context).warning,
+      description: description,
+      trailingIcon: enabled
+          ? null
+          : (unavailable ? LbIconSymbol.info : LbIconSymbol.alertOctagonFilled),
+      trailingIconColor: enabled
+          ? null
+          : (unavailable
+              ? LbPalette.of(context).textSecondary
+              : LbPalette.of(context).warning),
       onTap: onTap,
     );
   }
@@ -141,6 +293,8 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
       _buildPermissionItem(
         title: strings.listenerAccess,
         enabled: _listenerEnabled,
+        description:
+            _listenerEnabled ? null : strings.listenerRestrictedHint,
         onTap: () {
           unawaited(_openListenerSettings());
         },
@@ -156,14 +310,41 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
           }
         },
       ),
+      if (_capsuleRowVisible)
+        LbListItemData(
+          title: strings.capsuleOverlay,
+          description: strings.capsuleOverlayDescription,
+          toggleValue: _overlayGranted && _capsulePrefEnabled,
+          onToggle: (bool value) {
+            unawaited(_setCapsuleEnabled(value));
+          },
+          showChevron: false,
+        ),
+      if (_capsuleRowVisible)
+        LbListItemData(
+          title: strings.capsulePositionTitle,
+          onTap: () {
+            unawaited(LiveBridgeHaptics.selection());
+            unawaited(_showCapsulePositionDialog());
+          },
+        ),
       if (!_hidePromotedAccess)
         _buildPermissionItem(
           title: strings.liveUpdatesAccess,
           enabled: _canPostPromoted,
+          unavailable: _liveUpdatesUnavailableOnOs,
           onTap: () {
             unawaited(_openPromotedSettings());
           },
         ),
+      LbListItemData(
+        title: strings.adbHelpTitle,
+        description: strings.adbHelpDescription,
+        onTap: () {
+          unawaited(LiveBridgeHaptics.selection());
+          unawaited(_showAdbHelpSheet());
+        },
+      ),
     ];
 
     return LbDetailScreen(

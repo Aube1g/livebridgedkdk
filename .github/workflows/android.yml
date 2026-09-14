@@ -2,22 +2,39 @@ name: Android CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
+    tags: ["v*"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Build signed release APKs and publish a GitHub Release (requires keystore secrets)"
+        type: choice
+        options: ["false", "true"]
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
+    name: Build debug APK
+    if: ${{ github.event_name != 'push' || startsWith(github.ref, 'refs/heads/') }}
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          java-version: "17"
+          distribution: "temurin"
           cache: gradle
 
       - name: Set up Flutter
@@ -31,3 +48,137 @@ jobs:
 
       - name: Build debug APK
         run: flutter build apk --debug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: livebridge-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 90
+          if-no-files-found: error
+
+  release:
+    name: Build release APKs and publish
+    if: >-
+      ${{
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_release == 'true')
+      }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Resolve version
+        id: version
+        run: |
+          version="$(grep -E '^version:' pubspec.yaml | head -1 | cut -d' ' -f2)"
+          echo "name=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Check signing secrets
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && \
+             [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure release signing
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_NAME: ${{ secrets.KEYSTORE_NAME }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          name="${KEYSTORE_NAME:-release.keystore}"
+          mkdir -p android/keystores
+          echo "$KEYSTORE_BASE64" | base64 -d > "android/keystores/$name"
+          {
+            echo "storeFile=keystores/$name"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+          } > android/key.properties
+
+      - name: Build arm64 release APK
+        if: steps.signing.outputs.enabled == 'true'
+        run: flutter build apk --release --target-platform android-arm64
+
+      - name: Build universal release APK
+        if: steps.signing.outputs.enabled == 'true'
+        run: flutter build apk --release
+
+      - name: Stage release APKs
+        if: steps.signing.outputs.enabled == 'true'
+        run: |
+          version="${{ steps.version.outputs.name }}"
+          mkdir -p release-apks
+          cp "build/app/outputs/flutter-apk/app-arm64-v8a-release.apk" \
+             "release-apks/livebridge-${version}-armv8a.apk"
+          cp "build/app/outputs/flutter-apk/app-release.apk" \
+             "release-apks/livebridge-${version}-universal.apk"
+          ls -lh release-apks
+
+      - name: Upload release APK artifacts
+        if: steps.signing.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: livebridge-release
+          path: release-apks/*.apk
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: steps.signing.outputs.enabled == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', steps.version.outputs.name) }}
+          name: LiveBridge ${{ steps.version.outputs.name }}
+          files: |
+            release-apks/livebridge-*-armv8a.apk
+            release-apks/livebridge-*-universal.apk
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+
+      - name: Signing secrets missing (skip release)
+        if: steps.signing.outputs.enabled != 'true'
+        run: |
+          {
+            echo "## Release APKs were not built"
+            echo ""
+            echo "The job needs repository secrets to sign and publish release APKs:"
+            echo ""
+            echo "- \`KEYSTORE_BASE64\` — output of \`base64 -w0 your-release.keystore\`"
+            echo "- \`KEYSTORE_PASSWORD\`"
+            echo "- \`KEY_ALIAS\`"
+            echo "- \`KEY_PASSWORD\`"
+            echo "- \`KEYSTORE_NAME\` — optional, defaults to \`release.keystore\`"
+            echo ""
+            echo "Without them only the unsigned-release build is blocked; the debug"
+            echo " APK from the CI job remains installable for testing."
+          } >> "$GITHUB_STEP_SUMMARY"

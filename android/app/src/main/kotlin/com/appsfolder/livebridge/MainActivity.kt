@@ -57,6 +57,18 @@ class MainActivity : FlutterActivity() {
         super.onCreate(savedInstanceState)
     }
 
+    override fun onResume() {
+        super.onResume()
+        appInForeground = true
+        LiveUpdateNotifier.capsuleOverlay?.suspendWhileAppVisible()
+    }
+
+    override fun onPause() {
+        appInForeground = false
+        LiveUpdateNotifier.capsuleOverlay?.resumeIfActive()
+        super.onPause()
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -100,6 +112,23 @@ class MainActivity : FlutterActivity() {
             "canPostPromotedNotifications" -> res.success(canPostPromotedNotifications())
             "openPromotedNotificationSettings" -> res.success(openPromotedNotificationSettings())
             "openAppNotificationSettings" -> res.success(openAppNotificationSettings())
+            "hasOverlayPermission" -> res.success(Settings.canDrawOverlays(this))
+            "openOverlaySettings" -> res.success(openOverlaySettings())
+            "getCapsuleOverlayEnabled" -> res.success(prefs.getCapsuleOverlayEnabled())
+            "setCapsuleOverlayEnabled" -> {
+                prefs.setCapsuleOverlayEnabled(call.argument<Boolean>("value") ?: true)
+                res.success(true)
+            }
+            "getWelcomeV2Shown" -> res.success(prefs.getWelcomeV2Shown())
+            "setCapsulePositionPreset" -> {
+                val preset = call.argument<String>("value") ?: "center"
+                LiveUpdateNotifier.capsuleOverlay?.applyPreset(preset)
+                res.success(true)
+            }
+            "setWelcomeV2Shown" -> {
+                prefs.setWelcomeV2Shown(call.argument<Boolean>("value") ?: true)
+                res.success(true)
+            }
             "getInstalledApps" -> loadInstalledAppsAsync(res)
             "getDeviceInfo" -> res.success(getDeviceInfo())
             "exportLiveBridgeSettingsBackup" -> res.success(prefs.exportSettingsBackupJson())
@@ -972,6 +1001,14 @@ class MainActivity : FlutterActivity() {
         return launchSettingsIntent(appDetailsIntent())
     }
 
+    private fun openOverlaySettings(): Boolean {
+        val intent = Intent(
+            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            Uri.parse("package:$packageName")
+        )
+        return launchSettingsIntent(intent)
+    }
+
     private fun openPromotedNotificationSettings(): Boolean {
         val intent = Intent("android.settings.APP_NOTIFICATION_PROMOTION_SETTINGS").apply {
             putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
@@ -1172,6 +1209,7 @@ class MainActivity : FlutterActivity() {
     private fun getDeviceInfo(): Map<String, String> {
         val mn = DeviceProps.marketName()
         return mapOf(
+            "sdkInt" to Build.VERSION.SDK_INT.toString(),
             "manufacturer" to (Build.MANUFACTURER ?: ""),
             "brand" to (Build.BRAND ?: ""),
             "model" to mn,
@@ -1209,6 +1247,9 @@ class MainActivity : FlutterActivity() {
     }
 
     companion object {
+        @Volatile
+        var appInForeground = false
+
         private const val METHOD_CHANNEL = "livebridge/platform"
         private const val REQUEST_POST_NOTIFICATIONS = 2406
         private const val TAG = "MainActivity"

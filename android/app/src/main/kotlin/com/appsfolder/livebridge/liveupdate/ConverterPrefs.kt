@@ -114,6 +114,38 @@ class ConverterPrefs(context: Context) {
         prefs.edit().putBoolean(KEY_HINTS_DISABLED, value).apply()
     }
 
+    fun getCapsuleOverlayEnabled(): Boolean {
+        return prefs.getBoolean(KEY_CAPSULE_OVERLAY_ENABLED, true)
+    }
+
+    fun setCapsuleOverlayEnabled(value: Boolean) {
+        prefs.edit().putBoolean(KEY_CAPSULE_OVERLAY_ENABLED, value).apply()
+    }
+
+    fun getCapsulePositionX(): Int {
+        return prefs.getInt(KEY_CAPSULE_POSITION_X, -1)
+    }
+
+    fun setCapsulePositionX(value: Int) {
+        prefs.edit().putInt(KEY_CAPSULE_POSITION_X, value).apply()
+    }
+
+    fun getCapsulePositionY(): Int {
+        return prefs.getInt(KEY_CAPSULE_POSITION_Y, -1)
+    }
+
+    fun setCapsulePositionY(value: Int) {
+        prefs.edit().putInt(KEY_CAPSULE_POSITION_Y, value).apply()
+    }
+
+    fun getWelcomeV2Shown(): Boolean {
+        return prefs.getBoolean(KEY_WELCOME_V2_SHOWN, false)
+    }
+
+    fun setWelcomeV2Shown(value: Boolean) {
+        prefs.edit().putBoolean(KEY_WELCOME_V2_SHOWN, value).apply()
+    }
+
     fun getConversionLogEnabled(): Boolean {
         return prefs.getBoolean(KEY_CONVERSION_LOG_ENABLED, false)
     }
@@ -1132,6 +1164,10 @@ class ConverterPrefs(context: Context) {
         private const val KEY_CONVERTED_NOTIFICATION_SOUND_ENABLED =
             "converted_notification_sound_enabled"
         private const val KEY_HINTS_DISABLED = "hints_disabled"
+        private const val KEY_CAPSULE_OVERLAY_ENABLED = "capsule_overlay_enabled"
+        private const val KEY_CAPSULE_POSITION_X = "capsule_position_x"
+        private const val KEY_CAPSULE_POSITION_Y = "capsule_position_y"
+        private const val KEY_WELCOME_V2_SHOWN = "welcome_v2_shown"
         private const val KEY_CONVERSION_LOG_ENABLED = "conversion_log_enabled"
         private const val KEY_BUG_REPORT_AUTO_COPY_ENABLED = "bug_report_auto_copy_enabled"
         private const val KEY_APP_LANGUAGE_TAG = "app_language_tag"

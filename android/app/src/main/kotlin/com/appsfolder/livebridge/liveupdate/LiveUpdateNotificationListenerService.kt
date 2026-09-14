@@ -11,11 +11,14 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
+import com.appsfolder.livebridge.liveupdate.capsule.CapsuleOverlayManager
 import com.appsfolder.livebridge.liveupdate.networkspeed.NetworkSpeedController
+import com.appsfolder.livebridge.liveupdate.vpn.VpnStateMonitor
 import kotlin.math.min
 
 class LiveUpdateNotificationListenerService : NotificationListenerService() {
     private val prefs by lazy { ConverterPrefs(applicationContext) }
+    private val capsuleOverlay by lazy { CapsuleOverlayManager(applicationContext) }
     private val mainHandler = Handler(Looper.getMainLooper())
     private val selfDismissLock = Any()
     private val selfDismissedSourceKeys = mutableSetOf<String>()
@@ -65,6 +68,8 @@ class LiveUpdateNotificationListenerService : NotificationListenerService() {
         }
 
         LiveUpdateNotifier.ensureChannel(applicationContext)
+        LiveUpdateNotifier.capsuleOverlay = capsuleOverlay
+        VpnStateMonitor.start(applicationContext)
         NetworkSpeedController.sync(applicationContext, prefs)
         scheduleSnapshotSync()
     }
@@ -153,6 +158,11 @@ class LiveUpdateNotificationListenerService : NotificationListenerService() {
         if (activeInstance === this) {
             activeInstance = null
         }
+        if (LiveUpdateNotifier.capsuleOverlay === capsuleOverlay) {
+            LiveUpdateNotifier.capsuleOverlay = null
+        }
+        capsuleOverlay.release()
+        VpnStateMonitor.stop()
         super.onDestroy()
     }
 

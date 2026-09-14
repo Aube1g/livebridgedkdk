@@ -56,8 +56,10 @@ class _HomeRedesignScreenState extends State<HomeRedesignScreen>
   bool _notificationsGranted = false;
   bool _canPostPromoted = false;
   bool _hidePromotedAccess = false;
+  int _androidSdkInt = 0;
   bool _updateAvailable = false;
   String _currentAppVersion = 'v1.3.4';
+  bool _showWelcome = false;
   String _latestReleaseVersion = '';
   int _currentTabIndex = 0;
   bool _isDraggingNavSelector = false;
@@ -146,6 +148,24 @@ class _HomeRedesignScreenState extends State<HomeRedesignScreen>
           ),
         );
     unawaited(_loadLiveState());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_maybeShowWelcome());
+    });
+  }
+
+  Future<void> _maybeShowWelcome() async {
+    try {
+      final bool shown = await LiveBridgePlatform.getWelcomeV2Shown();
+      if (!shown && mounted) {
+        setState(() => _showWelcome = true);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _dismissWelcome() async {
+    setState(() => _showWelcome = false);
+    await LiveBridgePlatform.setWelcomeV2Shown(true);
+    unawaited(_pushRulesDetailScreen(const SettingsPermissionsScreen()));
   }
 
   @override
@@ -225,6 +245,18 @@ class _HomeRedesignScreenState extends State<HomeRedesignScreen>
     });
   }
 
+  Future<void> _openAuthorPage() async {
+    unawaited(LiveBridgeHaptics.openSurface());
+    final Uri authorUri = Uri.parse('https://t.me/Aubeig');
+    final bool opened = await launchUrl(
+      authorUri,
+      mode: LaunchMode.inAppBrowserView,
+    );
+    if (!opened) {
+      await launchUrl(authorUri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   Future<void> _pushRulesDetailScreen(Widget screen) async {
     await Navigator.of(context).push<void>(
       PageRouteBuilder<void>(
@@ -264,10 +296,16 @@ class _HomeRedesignScreenState extends State<HomeRedesignScreen>
   bool get _displayMasterSwitchValue =>
       _canToggleMaster && _isLiveBridgeRunning;
 
+  bool get _liveUpdatesUnavailableOnOs =>
+      _androidSdkInt > 0 &&
+      _androidSdkInt < DeviceInfo.liveUpdatesMinimumSdkInt;
+
   bool get _hasPermissionIssues {
     return !(_listenerEnabled &&
         _notificationsGranted &&
-        (_hidePromotedAccess || _canPostPromoted));
+        (_hidePromotedAccess ||
+            _canPostPromoted ||
+            _liveUpdatesUnavailableOnOs));
   }
 
   String get _displayVersion {
@@ -347,6 +385,7 @@ class _HomeRedesignScreenState extends State<HomeRedesignScreen>
         _notificationsGranted = notificationsGranted;
         _canPostPromoted = canPostPromoted;
         _hidePromotedAccess = deviceInfo.shouldHideLiveUpdatesPromotion;
+        _androidSdkInt = deviceInfo.sdkInt;
         _isLiveBridgeRunning = converterEnabled;
         _updateAvailable = sanitizedUpdateAvailable;
         _latestReleaseVersion = sanitizedLatestReleaseVersion;
@@ -877,7 +916,126 @@ class _HomeRedesignScreenState extends State<HomeRedesignScreen>
             },
           ),
         ],
+        const SizedBox(height: LbSpacing.md),
+        Center(
+          child: GestureDetector(
+            onTap: () {
+              unawaited(_openAuthorPage());
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  LbIcon(
+                    symbol: LbIconSymbol.externalLink,
+                    size: 14,
+                    color: palette.accent,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    strings.forkByTitle,
+                    style: LbTextStyles.body.copyWith(
+                      color: palette.accent,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _buildWelcomeOverlay(LbPalette palette, AppStrings strings) {
+    return Positioned.fill(
+      child: ColoredBox(
+        color: const Color(0xE6050310),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 340),
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+              decoration: BoxDecoration(
+                color: palette.surface,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: palette.navBorder),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: Image.asset(
+                      'assets/icons/icon-master.png',
+                      width: 84,
+                      height: 84,
+                      fit: BoxFit.cover,
+                      filterQuality: FilterQuality.high,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    strings.welcomeTitle,
+                    textAlign: TextAlign.center,
+                    style: LbTextStyles.cardTitle.copyWith(
+                      color: palette.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    strings.welcomeSubtitle,
+                    textAlign: TextAlign.center,
+                    style: LbTextStyles.body.copyWith(
+                      color: palette.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  GestureDetector(
+                    onTap: () {
+                      unawaited(LiveBridgeHaptics.confirm());
+                      unawaited(_dismissWelcome());
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: palette.accent,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Center(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Text(
+                              strings.welcomeAction,
+                              style: LbTextStyles.body.copyWith(
+                                color: palette.background,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            LbIcon(
+                              symbol: LbIconSymbol.chevronRight,
+                              size: 16,
+                              color: palette.background,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1151,6 +1309,7 @@ class _HomeRedesignScreenState extends State<HomeRedesignScreen>
                 ),
               ),
             ),
+            if (_showWelcome) _buildWelcomeOverlay(palette, strings),
           ],
         ),
       ),

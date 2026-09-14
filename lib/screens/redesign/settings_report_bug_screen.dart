@@ -193,6 +193,7 @@ class _SettingsReportBugScreenState extends State<SettingsReportBugScreen> {
       },
       'device': <String, dynamic>{
         'label': deviceInfo.label,
+        'android_sdk_int': deviceInfo.sdkInt,
         'manufacturer': deviceInfo.manufacturer,
         'brand': deviceInfo.brand,
         'market_name': deviceInfo.marketName,

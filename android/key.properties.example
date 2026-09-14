@@ -1,0 +1,9 @@
+# Copy this file to android/key.properties and fill in real values.
+# android/key.properties and *.keystore are gitignored — never commit them.
+#
+# storeFile is resolved relative to the android/ directory,
+# e.g. storeFile=keystores/release.keystore -> android/keystores/release.keystore
+storeFile=keystores/release.keystore
+keyAlias=livebridge
+keyPassword=change-me
+storePassword=change-me

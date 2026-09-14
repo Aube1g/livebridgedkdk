@@ -1612,6 +1612,236 @@ class AppStrings {
     ko: 'Live Updates 권한',
   );
 
+  String get liveUpdatesOsUnavailable => tr(
+    en:
+        'Live Updates requires Android 16 or newer. On this device, '
+        'converted notifications appear as regular notifications.',
+    ru:
+        'Live Updates требует Android 16 или новее. На этом устройстве '
+        'конвертированные уведомления отображаются как обычные уведомления.',
+    tr:
+        'Live Updates Android 16 veya üzerine ihtiyaç duyar. Bu cihazda '
+        'dönüştürülen bildirimler normal bildirim olarak görünür.',
+    ptBr:
+        'O Live Updates requer Android 16 ou mais novo. Neste dispositivo, '
+        'as notificações convertidas aparecem como notificações normais.',
+    zhHans: 'Live Updates 需要 Android 16 或更高版本。在此设备上，转换的通知将显示为普通通知。',
+    zhHant: 'Live Updates 需要 Android 16 或更高版本。在此裝置上，轉換的通知將顯示為普通通知。',
+    ko:
+        'Live Updates에는 Android 16 이상 필요합니다. 이 기기에서는 '
+        '변환된 알림이 일반 알림으로 표시됩니다.',
+  );
+
+  String get listenerRestrictedHint => tr(
+    en:
+        "If your phone shows 'Restricted setting', a device policy "
+        '(work profile / MDM) is blocking the toggle. Try Developer options '
+        '→ Disable restricted settings, or remove the work profile.',
+    ru:
+        'Если телефон показывает «Ограниченный параметр», это политика '
+        'устройства (рабочий профиль / MDM) блокирует тумблер. Попробуйте '
+        '«Параметры разработчика» → «Отключить ограниченные параметры» '
+        'или удалите рабочий профиль.',
+    tr:
+        "Telefonunuz 'Kısıtlı ayar' gösteriyorsa bir cihaz politikası "
+        '(iş profili / MDM) anahtarı engelliyor. Geliştirici seçenekleri '
+        '→ Kısıtlı ayarları devre dışı bırak'
+        "ı deneyin veya iş profilini kaldırın.",
+    ptBr:
+        "Se o celular exibir 'Restricted setting' (Configuração restrita), "
+        'uma política do dispositivo (perfil de trabalho / MDM) está '
+        'bloqueando a alternância. Tente Opções do desenvolvedor → '
+        'Desativar configurações restritas ou remova o perfil de trabalho.',
+    zhHans:
+        '如果手机显示「受限设置」，说明设备策略（工作资料 / MDM）正在阻止该开关。'
+        '请尝试「开发人员选项」→「停用受限设置」，或移除工作资料。',
+    zhHant:
+        '如果手機顯示「受限設定」，說明裝置策略（工作資料 / MDM）正在阻止該開關。'
+        '請嘗試「開發人員選項」→「停用受限設定」，或移除工作資料。',
+    ko:
+        "폰에서 '제한된 설정'이 표시되면 장치 정책(업무 프로필 / MDM)이 "
+        '토글을 차단하고 있습니다. 개발자 옵션 → 제한된 설정 비활성화를 '
+        '시도하거나 업무 프로필을 제거해 보세요.',
+  );
+
+  String get forkByTitle => tr(
+    en: 'Fork by Aubeig',
+    ru: 'Форк от Aubeig',
+    tr: 'Aubeig fork\'u',
+    ptBr: 'Fork de Aubeig',
+    zhHans: 'Aubeig 的分支',
+    zhHant: 'Aubeig 的分支',
+    ko: 'Aubeig 포크',
+  );
+
+  String get welcomeTitle => tr(
+    en: 'Welcome to LiveBridge',
+    ru: 'Добро пожаловать в LiveBridge',
+    tr: 'LiveBridge\'a hoş geldin',
+    ptBr: 'Bem-vindo ao LiveBridge',
+    zhHans: '欢迎使用 LiveBridge',
+    zhHant: '歡迎使用 LiveBridge',
+    ko: 'LiveBridge에 오신 것을 환영합니다',
+  );
+
+  String get welcomeSubtitle => tr(
+    en: 'A fork by Aubeig — built for Android 13+',
+    ru: 'Форк Aubeig — собран для Android 13+',
+    tr: 'Aubeig fork\'u — Android 13+ için yapıldı',
+    ptBr: 'Um fork de Aubeig — feito para Android 13+',
+    zhHans: 'Aubeig 的分支 — 专为 Android 13+ 打造',
+    zhHant: 'Aubeig 的分支 — 專為 Android 13+ 打造',
+    ko: 'Aubeig 포크 — Android 13+용',
+  );
+
+  String get welcomeAction => tr(
+    en: 'Let\'s go',
+    ru: 'Поехали',
+    tr: 'Hadi gidelim',
+    ptBr: 'Vamos lá',
+    zhHans: '开始吧',
+    zhHant: '開始吧',
+    ko: '시작하기',
+  );
+
+  String get adbHelpTitle => tr(
+    en: 'Grant access via ADB',
+    ru: 'Выдать доступ через ADB',
+    tr: 'ADB ile erişim ver',
+    ptBr: 'Conceder acesso via ADB',
+    zhHans: '通过 ADB 授权',
+    zhHant: '透過 ADB 授權',
+    ko: 'ADB로 권한 부여',
+  );
+
+  String get adbHelpDescription => tr(
+    en: 'If the system dialog is blocked or missing',
+    ru: 'Если системный диалог не работает',
+    tr: 'Sistem onayı engellenmişse',
+    ptBr: 'Se o diálogo do sistema não funcionar',
+    zhHans: '如果系统弹窗被拦截或不存在',
+    zhHant: '如果系統彈窗被攔截或不存在',
+    ko: '시스템 다이얼로그가 차단된 경우',
+  );
+
+  String get adbCopied => tr(
+    en: 'Command copied',
+    ru: 'Команда скопирована',
+    tr: 'Komut kopyalandı',
+    ptBr: 'Comando copiado',
+    zhHans: '命令已复制',
+    zhHant: '命令已複製',
+    ko: '명령이 복사되었습니다',
+  );
+
+  String get capsulePositionTitle => tr(
+    en: 'Capsule position',
+    ru: 'Расположение капсулы',
+    tr: 'Kapsül konumu',
+    ptBr: 'Posição da cápsula',
+    zhHans: '胶囊位置',
+    zhHant: '膠囊位置',
+    ko: '캡슐 위치',
+  );
+
+  String get capsulePositionLeft => tr(
+    en: 'Left',
+    ru: 'Слева',
+    tr: 'Sol',
+    ptBr: 'Esquerda',
+    zhHans: '左侧',
+    zhHant: '左側',
+    ko: '왼쪽',
+  );
+
+  String get capsulePositionCenter => tr(
+    en: 'Center',
+    ru: 'По центру',
+    tr: 'Orta',
+    ptBr: 'Centro',
+    zhHans: '居中',
+    zhHant: '置中',
+    ko: '가운데',
+  );
+
+  String get capsulePositionRight => tr(
+    en: 'Right',
+    ru: 'Справа',
+    tr: 'Sağ',
+    ptBr: 'Direita',
+    zhHans: '右侧',
+    zhHant: '右側',
+    ko: '오른쪽',
+  );
+
+  String get copyAction => tr(
+    en: 'Copy',
+    ru: 'Скопировать',
+    tr: 'Kopyala',
+    ptBr: 'Copiar',
+    zhHans: '复制',
+    zhHant: '複製',
+    ko: '복사',
+  );
+
+  String get madeByTitle => tr(
+    en: 'Made by Aubeig',
+    ru: 'Сделано Aubeig',
+    tr: 'Yapan: Aubeig',
+    ptBr: 'Feito por Aubeig',
+    zhHans: '作者：Aubeig',
+    zhHant: '作者：Aubeig',
+    ko: '제작: Aubeig',
+  );
+
+  String get capsuleOverlay => tr(
+    en: 'Floating capsule',
+    ru: 'Плавающая капсула',
+    tr: 'Yüzen kapsül',
+    ptBr: 'Cápsula flutuante',
+    zhHans: '悬浮胶囊',
+    zhHant: '懸浮膠囊',
+    ko: '부유 캡슐',
+  );
+
+  String get capsuleOverlayDescription => tr(
+    en:
+        'Show converted notifications in a floating capsule above other '
+        'apps (Android 13–15). Requires the "Display over other apps" '
+        'permission.',
+    ru:
+        'Показывает конвертации в плавающей капсуле поверх других '
+        'приложений (Android 13–15). Нужна настройка «Отображение поверх '
+        'других приложений».',
+    tr:
+        "Dönüştürülen bildirimleri diğer uygulamaların üzerinde yüzen bir "
+        "kapsülde gösterir (Android 13–15). 'Diğer uygulamaların üzerinde "
+        "görüntüleme' izni gerekir.",
+    ptBr:
+        'Mostra as notificações convertidas em uma cápsula flutuante acima '
+        'dos outros apps (Android 13–15). Exige a permissão "Exibir por '
+        'cima de outros apps".',
+    zhHans:
+        '在其他应用上方以悬浮胶囊显示已转换的通知（Android 13–15）。'
+        '需要「显示在其他应用上层」权限。',
+    zhHant:
+        '在其他應用程式上方以懸浮膠囊顯示已轉換的通知（Android 13–15）。'
+        '需要「顯示在其他應用程式上方」權限。',
+    ko:
+        '변환된 알림을 다른 앱 위에 떠 있는 캡슐로 표시합니다(Android '
+        '13–15). "다른 앱 위에 표시" 권한이 필요합니다.',
+  );
+
+  String get overlayUnavailable => tr(
+    en: "Couldn't open the overlay permission settings.",
+    ru: 'Не удалось открыть настройки разрешения.',
+    tr: 'Yükleme izni ayarları açılamadı.',
+    ptBr: 'Não foi possível abrir as configurações da permissão.',
+    zhHans: '无法打开权限设置。',
+    zhHant: '無法開啟權限設定。',
+    ko: '권한 설정을 열 수 없습니다.',
+  );
+
   String get settingsTitle => tr(
     en: 'Settings',
     ru: 'Настройки',
