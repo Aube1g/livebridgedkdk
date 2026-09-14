@@ -17,6 +17,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.VelocityTracker
 import android.view.View
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -32,6 +33,7 @@ enum class CapsuleKind {
     OTP,
     PROGRESS,
     PASSWORD,
+    CALL,
     VPN,
     SPEED
 }
@@ -67,6 +69,7 @@ data class CapsulePayload(
                 progressMax > 0 && !indeterminate -> CapsuleKind.PROGRESS
                 hasCopyAction(notification) -> CapsuleKind.OTP
                 PASSWORD_REGEX.containsMatchIn(combined) -> CapsuleKind.PASSWORD
+                CALL_REGEX.containsMatchIn(title) -> CapsuleKind.CALL
                 VPN_REGEX.containsMatchIn(combined) -> CapsuleKind.VPN
                 else -> CapsuleKind.GENERIC
             }
@@ -110,6 +113,10 @@ data class CapsulePayload(
         }
 
         private val PASSWORD_REGEX = Regex("(парол|password)", RegexOption.IGNORE_CASE)
+        // Title-only on purpose: call mirrors arrive as "Входящий вызов",
+        // "Идущий вызов", "Incoming call", ... — checking only the title
+        // avoids matching random bodies that merely mention a call.
+        private val CALL_REGEX = Regex("(входящ|исходящ|вызов|call)", RegexOption.IGNORE_CASE)
         private val VPN_REGEX = Regex("\\bvpn\\b", RegexOption.IGNORE_CASE)
         private val COPY_ACTION_REGEX =
             Regex("copy|скопир|копир|kopyla|копира", RegexOption.IGNORE_CASE)
@@ -157,6 +164,7 @@ class CapsuleOverlayManager(appContext: Context) {
     private var overlayPayload: CapsulePayload? = null
     private var lastSpeed: CapsulePayload? = null
     private var lastVpnFallback: CapsulePayload? = null
+    private var statusBarVisible = true
     private var activeKind: CapsuleKind? = null
     private var suppressedKey: String? = null
     private var speedMutedUntilMs = 0L
@@ -208,6 +216,7 @@ class CapsuleOverlayManager(appContext: Context) {
 
     private fun isPersistent(kind: CapsuleKind): Boolean {
         return kind == CapsuleKind.PROGRESS ||
+            kind == CapsuleKind.CALL ||
             kind == CapsuleKind.VPN ||
             kind == CapsuleKind.SPEED
     }
@@ -415,6 +424,7 @@ class CapsuleOverlayManager(appContext: Context) {
             wmParams = params
             view = created
             target = created
+            created.post { created.requestApplyInsets() }
             Log.d(TAG, "capsule shown: ${payload.kind} | ${payload.packageName}")
         }
         val previousSignature = boundText
@@ -423,8 +433,12 @@ class CapsuleOverlayManager(appContext: Context) {
         if (isNew) {
             target?.let { pill ->
                 pill.alpha = 0f
-                pill.translationY = -dp(20f).toFloat()
-                pill.animate().alpha(1f).translationY(0f).setDuration(220).start()
+                pill.translationY = targetTranslationY() - dp(20f).toFloat()
+                pill.animate()
+                    .alpha(targetAlpha())
+                    .translationY(targetTranslationY())
+                    .setDuration(220)
+                    .start()
                 if (payload.kind == CapsuleKind.OTP) {
                     pill.animate()
                         .scaleX(1.05f)
@@ -441,7 +455,7 @@ class CapsuleOverlayManager(appContext: Context) {
             // crossfade.
             target?.animate()?.alpha(0.45f)?.setDuration(60)
                 ?.withEndAction {
-                    target?.animate()?.alpha(1f)?.setDuration(160)?.start()
+                    target?.animate()?.alpha(targetAlpha())?.setDuration(160)?.start()
                 }
                 ?.start()
         }
@@ -480,7 +494,55 @@ class CapsuleOverlayManager(appContext: Context) {
     private fun buildView(): View {
         val root = LayoutInflater.from(context).inflate(R.layout.capsule_overlay, null)
         attachInteractions(root)
+        attachStatusBarObserver(root)
         return root
+    }
+
+    /**
+     * Hides the pill while the system status bar is hidden (fullscreen video
+     * or a game) and brings it back when the bar returns. The overlay window
+     * receives the status bar inset source, so the top inset is non-zero only
+     * while the bar is visible.
+     */
+    private fun attachStatusBarObserver(root: View) {
+        root.setOnApplyWindowInsetsListener { v, insets ->
+            val top = insets.getInsets(WindowInsets.Type.statusBars()).top
+            val visible = top > 0
+            Log.d(TAG, "insets: statusBars top=$top")
+            if (visible != statusBarVisible) {
+                statusBarVisible = visible
+                Log.d(TAG, "status bar " + (if (visible) "visible" else "hidden"))
+                applyStatusBarTransform(v, animate = true)
+            }
+            insets
+        }
+    }
+
+    /**
+     * Applies the status-bar-driven transform: hidden bar -> the pill slides
+     * up and fades out; visible bar -> it returns to its position. Never
+     * touches the view while the user is dragging it.
+     */
+    private fun applyStatusBarTransform(root: View, animate: Boolean) {
+        if (isDragging || isLongPressDragging) {
+            return
+        }
+        val targetY = targetTranslationY()
+        val targetA = targetAlpha()
+        if (animate) {
+            root.animate().translationY(targetY).alpha(targetA).setDuration(160).start()
+        } else {
+            root.translationY = targetY
+            root.alpha = targetA
+        }
+    }
+
+    private fun targetTranslationY(): Float {
+        return if (statusBarVisible) 0f else -dp(60f).toFloat()
+    }
+
+    private fun targetAlpha(): Float {
+        return if (statusBarVisible) 1f else 0f
     }
 
     private fun bindView(root: View, payload: CapsulePayload) {
@@ -580,8 +642,7 @@ class CapsuleOverlayManager(appContext: Context) {
         }
 
         if (!isDragging && !isLongPressDragging) {
-            root.alpha = 1f
-            root.translationY = 0f
+            applyStatusBarTransform(root, animate = false)
         }
 
         updateDots(root)
@@ -698,7 +759,11 @@ class CapsuleOverlayManager(appContext: Context) {
                             dismissed()
                         }
                         else -> {
-                            v.animate().alpha(1f).translationY(0f).setDuration(120).start()
+                            v.animate()
+                                .alpha(targetAlpha())
+                                .translationY(targetTranslationY())
+                                .setDuration(120)
+                                .start()
                             if (!isDragging) {
                                 openApp()
                             }
@@ -714,7 +779,11 @@ class CapsuleOverlayManager(appContext: Context) {
                     velocityTracker = null
                     isDragging = false
                     isLongPressDragging = false
-                    v.animate().alpha(1f).translationY(0f).setDuration(120).start()
+                    v.animate()
+                        .alpha(targetAlpha())
+                        .translationY(targetTranslationY())
+                        .setDuration(120)
+                        .start()
                     true
                 }
                 else -> false
@@ -745,7 +814,7 @@ class CapsuleOverlayManager(appContext: Context) {
                 bindView(v, next)
                 v.translationX = direction * slide
                 v.alpha = 0f
-                v.animate().translationX(0f).alpha(1f).setDuration(140).start()
+                v.animate().translationX(0f).alpha(targetAlpha()).setDuration(140).start()
             }
             .start()
     }
