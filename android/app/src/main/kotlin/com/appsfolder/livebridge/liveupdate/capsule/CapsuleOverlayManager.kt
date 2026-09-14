@@ -264,7 +264,10 @@ class CapsuleOverlayManager(appContext: Context) {
             TAG,
             "slot upserted: $key (total=${slots.size}, index=$currentSlotIndex)"
         )
-        render(displayedPayload())
+        val payload = displayedPayload()
+        if (payload != null) {
+            render(payload)
+        }
     }
 
     /** The source of a slot (its mirror) is gone. */
