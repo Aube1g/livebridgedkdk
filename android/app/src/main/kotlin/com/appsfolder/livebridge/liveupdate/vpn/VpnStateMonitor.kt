@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import android.util.Log
 import com.appsfolder.livebridge.liveupdate.LiveUpdateNotifier
 
@@ -49,10 +48,7 @@ object VpnStateMonitor {
                 }
             }
             callback = networkCallback
-            connectivity.registerDefaultNetworkCallback(
-                networkCallback,
-                NetworkRequest.Builder().build()
-            )
+            connectivity.registerDefaultNetworkCallback(networkCallback)
             Log.d(TAG, "started")
         } catch (error: Throwable) {
             Log.w(TAG, "registerDefaultNetworkCallback failed", error)
@@ -83,7 +79,7 @@ object VpnStateMonitor {
 
     private fun handleCapabilities(capabilities: NetworkCapabilities) {
         val isVpn = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
-        val packageName = if (isVpn) capabilities.vpnPackage else null
+        val packageName = if (isVpn) capabilities.getVpnPackage() else null
         Log.d(TAG, "vpn state: $isVpn package=$packageName")
         if (isVpn) {
             activeVpnPackage = packageName
