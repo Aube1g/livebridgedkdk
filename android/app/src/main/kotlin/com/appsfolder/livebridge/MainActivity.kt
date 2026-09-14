@@ -120,6 +120,11 @@ class MainActivity : FlutterActivity() {
                 res.success(true)
             }
             "getWelcomeV2Shown" -> res.success(prefs.getWelcomeV2Shown())
+            "setCapsulePositionPreset" -> {
+                val preset = call.argument<String>("value") ?: "center"
+                LiveUpdateNotifier.capsuleOverlay?.applyPreset(preset)
+                res.success(true)
+            }
             "setWelcomeV2Shown" -> {
                 prefs.setWelcomeV2Shown(call.argument<Boolean>("value") ?: true)
                 res.success(true)

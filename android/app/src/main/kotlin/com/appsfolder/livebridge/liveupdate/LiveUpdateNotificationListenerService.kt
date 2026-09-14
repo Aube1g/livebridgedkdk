@@ -13,6 +13,7 @@ import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import com.appsfolder.livebridge.liveupdate.capsule.CapsuleOverlayManager
 import com.appsfolder.livebridge.liveupdate.networkspeed.NetworkSpeedController
+import com.appsfolder.livebridge.liveupdate.vpn.VpnStateMonitor
 import kotlin.math.min
 
 class LiveUpdateNotificationListenerService : NotificationListenerService() {
@@ -68,6 +69,7 @@ class LiveUpdateNotificationListenerService : NotificationListenerService() {
 
         LiveUpdateNotifier.ensureChannel(applicationContext)
         LiveUpdateNotifier.capsuleOverlay = capsuleOverlay
+        VpnStateMonitor.start(applicationContext)
         NetworkSpeedController.sync(applicationContext, prefs)
         scheduleSnapshotSync()
     }
@@ -160,6 +162,7 @@ class LiveUpdateNotificationListenerService : NotificationListenerService() {
             LiveUpdateNotifier.capsuleOverlay = null
         }
         capsuleOverlay.release()
+        VpnStateMonitor.stop()
         super.onDestroy()
     }
 

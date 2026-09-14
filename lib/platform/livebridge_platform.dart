@@ -52,6 +52,8 @@ class LiveBridgePlatform {
   static Future<bool> setCapsuleOverlayEnabled(bool value) =>
       _askBool('setCapsuleOverlayEnabled', {'value': value});
   static Future<bool> getWelcomeV2Shown() => _askBool('getWelcomeV2Shown');
+  static Future<bool> setCapsulePositionPreset(String preset) =>
+      _askBool('setCapsulePositionPreset', {'value': preset});
   static Future<bool> setWelcomeV2Shown(bool value) =>
       _askBool('setWelcomeV2Shown', {'value': value});
   static Future<String> exportLiveBridgeSettingsBackup() =>

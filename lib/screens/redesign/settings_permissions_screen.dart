@@ -131,6 +131,49 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
     _snack(AppStrings.of(context).notificationsUnavailable);
   }
 
+  Future<void> _showCapsulePositionDialog() async {
+    final AppStrings strings = AppStrings.of(context);
+    final LbPalette palette = LbPalette.of(context);
+    final List<Widget> options = <Widget>[
+      for (MapEntry<String, String> option in <MapEntry<String, String>>[
+        MapEntry<String, String>('left', strings.capsulePositionLeft),
+        MapEntry<String, String>('center', strings.capsulePositionCenter),
+        MapEntry<String, String>('right', strings.capsulePositionRight),
+      ])
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            unawaited(LiveBridgePlatform.setCapsulePositionPreset(option.key));
+          },
+          child: Text(
+            option.value,
+            style: TextStyle(color: palette.textPrimary),
+          ),
+        ),
+    ];
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: palette.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: Text(
+            strings.capsulePositionTitle,
+            style: LbTextStyles.cardTitle.copyWith(
+              color: palette.textPrimary,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: options,
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _showAdbHelpSheet() async {
     final AppStrings strings = AppStrings.of(context);
     final LbPalette palette = LbPalette.of(context);
@@ -276,6 +319,14 @@ class _SettingsPermissionsScreenState extends State<SettingsPermissionsScreen>
             unawaited(_setCapsuleEnabled(value));
           },
           showChevron: false,
+        ),
+      if (_capsuleRowVisible)
+        LbListItemData(
+          title: strings.capsulePositionTitle,
+          onTap: () {
+            unawaited(LiveBridgeHaptics.selection());
+            unawaited(_showCapsulePositionDialog());
+          },
         ),
       if (!_hidePromotedAccess)
         _buildPermissionItem(

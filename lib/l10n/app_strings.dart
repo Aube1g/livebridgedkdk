@@ -1734,6 +1734,46 @@ class AppStrings {
     ko: '명령이 복사되었습니다',
   );
 
+  String get capsulePositionTitle => tr(
+    en: 'Capsule position',
+    ru: 'Расположение капсулы',
+    tr: 'Kapsül konumu',
+    ptBr: 'Posição da cápsula',
+    zhHans: '胶囊位置',
+    zhHant: '膠囊位置',
+    ko: '캡슐 위치',
+  );
+
+  String get capsulePositionLeft => tr(
+    en: 'Left',
+    ru: 'Слева',
+    tr: 'Sol',
+    ptBr: 'Esquerda',
+    zhHans: '左侧',
+    zhHant: '左側',
+    ko: '왼쪽',
+  );
+
+  String get capsulePositionCenter => tr(
+    en: 'Center',
+    ru: 'По центру',
+    tr: 'Orta',
+    ptBr: 'Centro',
+    zhHans: '居中',
+    zhHant: '置中',
+    ko: '가운데',
+  );
+
+  String get capsulePositionRight => tr(
+    en: 'Right',
+    ru: 'Справа',
+    tr: 'Sağ',
+    ptBr: 'Direita',
+    zhHans: '右侧',
+    zhHant: '右側',
+    ko: '오른쪽',
+  );
+
   String get copyAction => tr(
     en: 'Copy',
     ru: 'Скопировать',

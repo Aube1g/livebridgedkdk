@@ -77,6 +77,17 @@ data class CapsulePayload(
             )
         }
 
+        fun vpnFallback(packageName: String): CapsulePayload {
+            return CapsulePayload(
+                title = "VPN",
+                text = "",
+                packageName = packageName,
+                progress = 0,
+                progressMax = 0,
+                kind = CapsuleKind.VPN
+            )
+        }
+
         fun speed(packageName: String, speedText: String): CapsulePayload {
             return CapsulePayload(
                 title = "",
@@ -124,10 +135,13 @@ class CapsuleOverlayManager(appContext: Context) {
     private var view: View? = null
     private var wmParams: WindowManager.LayoutParams? = null
     private var lastPayload: CapsulePayload? = null
+    private var overlayPayload: CapsulePayload? = null
     private var lastSpeed: CapsulePayload? = null
+    private var lastVpnFallback: CapsulePayload? = null
     private var activeKind: CapsuleKind? = null
     private var suppressedKey: String? = null
     private var speedMutedUntilMs = 0L
+    private var overlayReturnToken = 0L
     private var boundText = ""
     private var isDragging = false
     private var isLongPressDragging = false
@@ -160,6 +174,21 @@ class CapsuleOverlayManager(appContext: Context) {
         grabOffsetY = (lastY - params.y).toInt()
     }
 
+    private val overlayReturnRunnable = Runnable {
+        val persistent = lastPayload ?: return@Runnable
+        if (overlayPayload == null) {
+            return@Runnable
+        }
+        overlayPayload = null
+        render(persistent)
+    }
+
+    private fun isPersistent(kind: CapsuleKind): Boolean {
+        return kind == CapsuleKind.PROGRESS ||
+            kind == CapsuleKind.VPN ||
+            kind == CapsuleKind.SPEED
+    }
+
     /** A conversion (mirror) is active — the pill takes priority. */
     fun show(payload: CapsulePayload) {
         val skip = showSkipReason(payload)
@@ -168,6 +197,29 @@ class CapsuleOverlayManager(appContext: Context) {
             removeView()
             return
         }
+        val currentPersistent = lastPayload
+        if (
+            !isPersistent(payload.kind) &&
+            currentPersistent != null &&
+            isPersistent(currentPersistent.kind)
+        ) {
+            // Transient state (OTP code, "password required", ...) overlays the
+            // persistent one for a few seconds, then the pill returns to it.
+            overlayPayload = payload
+            positionHandler.removeCallbacks(overlayReturnRunnable)
+            overlayReturnToken++
+            positionHandler.postDelayed(overlayReturnRunnable, TRANSIENT_OVERLAY_MS)
+            render(payload)
+            return
+        }
+        if (isPersistent(payload.kind) && overlayPayload != null) {
+            // Persistent source updated while a transient overlay is on screen —
+            // remember it, let the overlay finish first.
+            lastPayload = payload
+            return
+        }
+        overlayPayload = null
+        positionHandler.removeCallbacks(overlayReturnRunnable)
         lastPayload = payload
         render(payload)
     }
@@ -180,7 +232,7 @@ class CapsuleOverlayManager(appContext: Context) {
         }
         val payload = CapsulePayload.speed(context.packageName, speedText)
         lastSpeed = payload
-        if (lastPayload == null) {
+        if (lastPayload == null && lastVpnFallback == null) {
             render(payload)
         }
     }
@@ -193,12 +245,38 @@ class CapsuleOverlayManager(appContext: Context) {
         }
     }
 
-    /** The conversion ended; fall back to the speed pill if it is live. */
+    /** System VPN is active but the client is silent — minimal pill. */
+    fun showVpnFallback(packageName: String?) {
+        val payload = CapsulePayload.vpnFallback(packageName ?: context.packageName)
+        lastVpnFallback = payload
+        if (lastPayload == null && overlayPayload == null) {
+            render(payload)
+        }
+    }
+
+    fun clearVpnFallback() {
+        lastVpnFallback = null
+        if (activeKind == CapsuleKind.VPN && lastPayload == null && overlayPayload == null) {
+            val speed = lastSpeed
+            if (speed != null) {
+                render(speed)
+            } else {
+                removeView()
+            }
+        }
+    }
+
+    /** The conversion ended; fall back to VPN/speed sources if they are live. */
     fun hide() {
         lastPayload = null
+        overlayPayload = null
+        positionHandler.removeCallbacks(overlayReturnRunnable)
         suppressedKey = null
+        val vpn = lastVpnFallback
         val speed = lastSpeed
-        if (speed != null) {
+        if (vpn != null) {
+            render(vpn)
+        } else if (speed != null) {
             render(speed)
         } else {
             removeView()
@@ -207,7 +285,7 @@ class CapsuleOverlayManager(appContext: Context) {
 
     /** Keeps the payload but hides the pill while LiveBridge is on screen. */
     fun suspendWhileAppVisible() {
-        if (lastPayload != null || lastSpeed != null) {
+        if (lastPayload != null || lastSpeed != null || lastVpnFallback != null) {
             removeView()
         }
     }
@@ -217,6 +295,11 @@ class CapsuleOverlayManager(appContext: Context) {
         val payload = lastPayload
         if (payload != null) {
             show(payload)
+            return
+        }
+        val vpn = lastVpnFallback
+        if (vpn != null) {
+            render(vpn)
             return
         }
         val speed = lastSpeed ?: return
@@ -506,6 +589,28 @@ class CapsuleOverlayManager(appContext: Context) {
         prefs.setCapsulePositionY(params.y)
     }
 
+    /** Called from the settings UI: left / center / right preset. */
+    fun applyPreset(preset: String) {
+        val metrics = context.resources.displayMetrics
+        val v = view
+        val width = if (v != null && v.width > 0) v.width else dp(200f)
+        val x = when (preset) {
+            "left" -> dp(12f)
+            "right" -> (metrics.widthPixels - width - dp(12f)).coerceAtLeast(0)
+            else -> ((metrics.widthPixels - width) / 2).coerceAtLeast(0)
+        }
+        val prefs = ConverterPrefs(context)
+        val y = prefs.getCapsulePositionY().let {
+            if (it >= 0) it else statusBarHeightPx() + dp(6f)
+        }
+        prefs.setCapsulePositionX(x)
+        prefs.setCapsulePositionY(y)
+        if (v != null) {
+            moveWindow(x, y)
+        }
+        Log.d(TAG, "position preset applied: $preset")
+    }
+
     private fun dismissed() {
         if (activeKind == CapsuleKind.SPEED) {
             // Swiping the speed pill away mutes it for a minute.
@@ -599,5 +704,6 @@ class CapsuleOverlayManager(appContext: Context) {
     private companion object {
         const val TAG = "CapsuleOverlay"
         const val LIVE_UPDATES_MIN_SDK_INT = 36
+        const val TRANSIENT_OVERLAY_MS = 3_500L
     }
 }
