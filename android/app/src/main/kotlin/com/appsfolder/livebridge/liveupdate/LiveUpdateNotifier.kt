@@ -1336,6 +1336,7 @@ object LiveUpdateNotifier {
         }
 
         var noMirrorsLeft = false
+        var removedMirrorKey: String? = null
         synchronized(stateLock) {
             val now = SystemClock.elapsedRealtime()
             pruneProgrammaticMirrorCancelsLocked(now)
@@ -1344,6 +1345,7 @@ object LiveUpdateNotifier {
             }
 
             val mirrorKey = mirrorKeysByNotificationId.remove(sbn.id) ?: return
+            removedMirrorKey = mirrorKey
             userDismissedMirrorKeys.add(mirrorKey)
             callMirrorStates.remove(mirrorKey)
             smartAnimationGenerations.remove(mirrorKey)
@@ -1351,6 +1353,7 @@ object LiveUpdateNotifier {
             otpAnimationGenerations.remove(mirrorKey)
             noMirrorsLeft = mirrorKeysByNotificationId.isEmpty()
         }
+        removedMirrorKey?.let { capsuleOverlay?.removeSlot(it) }
         if (noMirrorsLeft) {
             capsuleOverlay?.hide()
         }
@@ -4627,7 +4630,7 @@ object LiveUpdateNotifier {
             mirrorKeysByNotificationId[notificationId] = mirrorKey
         }
         if (Build.VERSION.SDK_INT < 36) {
-            capsuleOverlay?.show(CapsulePayload.from(notification, sbn.packageName))
+            capsuleOverlay?.show(CapsulePayload.from(notification, sbn.packageName), mirrorKey)
         }
     }
 
@@ -4636,16 +4639,19 @@ object LiveUpdateNotifier {
         notificationId: Int
     ) {
         var noMirrorsLeft = false
+        var removedMirrorKey: String? = null
         synchronized(stateLock) {
             programmaticMirrorCancelDeadlines[notificationId] =
                 SystemClock.elapsedRealtime() + PROGRAMMATIC_MIRROR_CANCEL_GRACE_MS
             val mirrorKey = mirrorKeysByNotificationId.remove(notificationId)
             if (mirrorKey != null) {
+                removedMirrorKey = mirrorKey
                 callMirrorStates.remove(mirrorKey)
             }
             noMirrorsLeft = mirrorKeysByNotificationId.isEmpty()
         }
         manager.cancel(notificationId)
+        removedMirrorKey?.let { capsuleOverlay?.removeSlot(it) }
         if (noMirrorsLeft) {
             capsuleOverlay?.hide()
         }

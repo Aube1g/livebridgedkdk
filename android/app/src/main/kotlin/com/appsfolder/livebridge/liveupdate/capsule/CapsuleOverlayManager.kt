@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -14,9 +15,11 @@ import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
+import android.view.VelocityTracker
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import com.appsfolder.livebridge.MainActivity
@@ -114,14 +117,29 @@ data class CapsulePayload(
 }
 
 /**
+ * A single active state occupying the island (e.g. one download in flight).
+ * Several slots can be alive at once — the user swipes horizontally between
+ * them; the little dots under the pill are the pager indicator.
+ */
+data class CapsuleSlot(
+    val payload: CapsulePayload,
+    val key: String
+)
+
+/**
  * Renders the in-app "capsule" — an island-style floating pill drawn above
  * other apps. Used on API 33–35, where the OS Live Updates island surface is
  * unavailable; on API 36+ the native island is used instead.
  *
- * Two sources feed the pill:
- *  - converted notifications (mirrors) — always take priority;
+ * Sources feeding the pill, by priority:
+ *  - transient states (OTP code, "password required", plain messages) —
+ *    overlay whatever is on screen for a few seconds, then the pill returns
+ *    to the state underneath;
+ *  - persistent conversion (mirror) slots — several can be active at once,
+ *    swipe horizontally between them (dots indicator);
+ *  - the system VPN fallback pill (ConnectivityManager-based, VpnStateMonitor);
  *  - the network speed foreground service — a persistent, self-updating pill
- *    shown while no conversion is active.
+ *    shown while nothing else is active.
  *
  * The overlay view is owned by the notification listener service, so it
  * lives and dies together with the app process.
@@ -134,18 +152,19 @@ class CapsuleOverlayManager(appContext: Context) {
 
     private var view: View? = null
     private var wmParams: WindowManager.LayoutParams? = null
-    private var lastPayload: CapsulePayload? = null
+    private val slots = ArrayDeque<CapsuleSlot>()
+    private var currentSlotIndex = 0
     private var overlayPayload: CapsulePayload? = null
     private var lastSpeed: CapsulePayload? = null
     private var lastVpnFallback: CapsulePayload? = null
     private var activeKind: CapsuleKind? = null
     private var suppressedKey: String? = null
     private var speedMutedUntilMs = 0L
-    private var overlayReturnToken = 0L
     private var boundText = ""
     private var isDragging = false
     private var isLongPressDragging = false
     private var longPressPending = false
+    private var velocityTracker: VelocityTracker? = null
     private var grabOffsetX = 0
     private var grabOffsetY = 0
     private var downX = 0f
@@ -175,12 +194,16 @@ class CapsuleOverlayManager(appContext: Context) {
     }
 
     private val overlayReturnRunnable = Runnable {
-        val persistent = lastPayload ?: return@Runnable
         if (overlayPayload == null) {
             return@Runnable
         }
         overlayPayload = null
-        render(persistent)
+        val payload = displayedPayload()
+        if (payload != null) {
+            render(payload)
+        } else {
+            removeView()
+        }
     }
 
     private fun isPersistent(kind: CapsuleKind): Boolean {
@@ -189,42 +212,96 @@ class CapsuleOverlayManager(appContext: Context) {
             kind == CapsuleKind.SPEED
     }
 
-    /** A conversion (mirror) is active — the pill takes priority. */
-    fun show(payload: CapsulePayload) {
-        val skip = showSkipReason(payload)
+    /**
+     * The payload currently owning the island: transient overlay > active
+     * slot > system VPN fallback > network speed.
+     */
+    private fun displayedPayload(): CapsulePayload? {
+        overlayPayload?.let { return it }
+        slots.getOrNull(currentSlotIndex)?.let { return it.payload }
+        lastVpnFallback?.let { return it }
+        return lastSpeed
+    }
+
+    /**
+     * A converted notification (mirror) is active or updated.
+     *
+     * @param sourceKey stable per-mirror key from the notifier; persistent
+     *   states are tracked as slots keyed by it so that several concurrent
+     *   states (two downloads, download + VPN, ...) can be swiped between.
+     */
+    fun show(payload: CapsulePayload, sourceKey: String? = null) {
+        val key = sourceKey ?: payload.suppressKey
+        val skip = showSkipReason(payload, key)
         if (skip != null) {
             Log.d(TAG, "show skipped ($skip): ${payload.packageName} | ${payload.title}")
-            removeView()
+            if (skip != "suppressed") {
+                removeView()
+            }
             return
         }
-        val currentPersistent = lastPayload
-        if (
-            !isPersistent(payload.kind) &&
-            currentPersistent != null &&
-            isPersistent(currentPersistent.kind)
-        ) {
-            // Transient state (OTP code, "password required", ...) overlays the
-            // persistent one for a few seconds, then the pill returns to it.
+        if (!isPersistent(payload.kind)) {
+            // Transient state (OTP code, "password required", plain message)
+            // overlays the current state for a few seconds, then the pill
+            // returns to whatever was underneath.
             overlayPayload = payload
             positionHandler.removeCallbacks(overlayReturnRunnable)
-            overlayReturnToken++
             positionHandler.postDelayed(overlayReturnRunnable, TRANSIENT_OVERLAY_MS)
             render(payload)
             return
         }
-        if (isPersistent(payload.kind) && overlayPayload != null) {
-            // Persistent source updated while a transient overlay is on screen —
-            // remember it, let the overlay finish first.
-            lastPayload = payload
+        val hadSlots = slots.isNotEmpty()
+        upsertSlot(payload, key)
+        if (overlayPayload != null) {
+            // Transient overlay is on screen — the slot data is updated, the
+            // overlay finishes first and the return renders the fresh slot.
             return
         }
-        overlayPayload = null
-        positionHandler.removeCallbacks(overlayReturnRunnable)
-        lastPayload = payload
-        render(payload)
+        if (!hadSlots) {
+            currentSlotIndex = 0
+        }
+        Log.d(
+            TAG,
+            "slot upserted: $key (total=${slots.size}, index=$currentSlotIndex)"
+        )
+        render(displayedPayload())
     }
 
-    /** Network speed tick from the FGS — shown while no conversion is active. */
+    /** The source of a slot (its mirror) is gone. */
+    fun removeSlot(sourceKey: String, animateExit: Boolean = false) {
+        val index = slots.indexOfFirst { it.key == sourceKey }
+        if (index < 0) {
+            return
+        }
+        slots.removeAt(index)
+        if (index < currentSlotIndex) {
+            currentSlotIndex--
+        }
+        if (currentSlotIndex >= slots.size) {
+            currentSlotIndex = (slots.size - 1).coerceAtLeast(0)
+        }
+        Log.d(
+            TAG,
+            "slot removed: $sourceKey (total=${slots.size}, index=$currentSlotIndex)"
+        )
+        val payload = displayedPayload()
+        if (payload != null) {
+            render(payload)
+        } else if (animateExit && view != null) {
+            view?.let { pill ->
+                pill.animate()
+                    .alpha(0f)
+                    .translationY(dp(72f).toFloat())
+                    .setDuration(160)
+                    .withEndAction { removeView() }
+                    .start()
+            }
+        } else {
+            removeView()
+        }
+    }
+
+    /** Network speed tick from the FGS — shown while nothing else is active. */
     fun showSpeed(speedText: String) {
         if (SystemClock.elapsedRealtime() < speedMutedUntilMs) {
             lastSpeed = null
@@ -232,7 +309,7 @@ class CapsuleOverlayManager(appContext: Context) {
         }
         val payload = CapsulePayload.speed(context.packageName, speedText)
         lastSpeed = payload
-        if (lastPayload == null && lastVpnFallback == null) {
+        if (slots.isEmpty() && lastVpnFallback == null && overlayPayload == null) {
             render(payload)
         }
     }
@@ -249,14 +326,14 @@ class CapsuleOverlayManager(appContext: Context) {
     fun showVpnFallback(packageName: String?) {
         val payload = CapsulePayload.vpnFallback(packageName ?: context.packageName)
         lastVpnFallback = payload
-        if (lastPayload == null && overlayPayload == null) {
+        if (slots.isEmpty() && overlayPayload == null) {
             render(payload)
         }
     }
 
     fun clearVpnFallback() {
         lastVpnFallback = null
-        if (activeKind == CapsuleKind.VPN && lastPayload == null && overlayPayload == null) {
+        if (slots.isEmpty() && overlayPayload == null) {
             val speed = lastSpeed
             if (speed != null) {
                 render(speed)
@@ -266,53 +343,56 @@ class CapsuleOverlayManager(appContext: Context) {
         }
     }
 
-    /** The conversion ended; fall back to VPN/speed sources if they are live. */
+    /** All mirrors are gone; fall back to VPN/speed sources if they are live. */
     fun hide() {
-        lastPayload = null
+        slots.clear()
+        currentSlotIndex = 0
         overlayPayload = null
         positionHandler.removeCallbacks(overlayReturnRunnable)
         suppressedKey = null
-        val vpn = lastVpnFallback
-        val speed = lastSpeed
-        if (vpn != null) {
-            render(vpn)
-        } else if (speed != null) {
-            render(speed)
+        val payload = lastVpnFallback ?: lastSpeed
+        if (payload != null) {
+            render(payload)
         } else {
             removeView()
         }
     }
 
-    /** Keeps the payload but hides the pill while LiveBridge is on screen. */
+    /** Keeps the state but hides the pill while LiveBridge is on screen. */
     fun suspendWhileAppVisible() {
-        if (lastPayload != null || lastSpeed != null || lastVpnFallback != null) {
+        if (displayedPayload() != null) {
             removeView()
         }
     }
 
-    /** Re-shows the pill if a source is still active. */
+    /** Re-shows the pill if any source is still active. */
     fun resumeIfActive() {
-        val payload = lastPayload
+        val payload = displayedPayload()
         if (payload != null) {
-            show(payload)
-            return
+            render(payload)
+        } else {
+            removeView()
         }
-        val vpn = lastVpnFallback
-        if (vpn != null) {
-            render(vpn)
-            return
-        }
-        val speed = lastSpeed ?: return
-        render(speed)
     }
 
     fun release() {
         positionHandler.removeCallbacksAndMessages(null)
+        velocityTracker?.recycle()
+        velocityTracker = null
         hide()
     }
 
+    private fun upsertSlot(payload: CapsulePayload, key: String) {
+        val existingIndex = slots.indexOfFirst { it.key == key }
+        if (existingIndex >= 0) {
+            slots[existingIndex] = CapsuleSlot(payload, key)
+        } else {
+            slots.addLast(CapsuleSlot(payload, key))
+        }
+    }
+
     private fun render(payload: CapsulePayload) {
-        val skip = showSkipReason(payload)
+        val skip = showSkipReason(payload, keyForPayload(payload))
         if (skip != null) {
             Log.d(TAG, "render skipped ($skip): ${payload.kind}")
             removeView()
@@ -334,7 +414,7 @@ class CapsuleOverlayManager(appContext: Context) {
             target = created
             Log.d(TAG, "capsule shown: ${payload.kind} | ${payload.packageName}")
         }
-        val previousText = boundText
+        val previousSignature = boundText
         bindView(target, payload)
         activeKind = payload.kind
         if (isNew) {
@@ -353,8 +433,9 @@ class CapsuleOverlayManager(appContext: Context) {
                         .start()
                 }
             }
-        } else if (boundText != previousText && boundText.isNotEmpty()) {
-            // Content changed in place (speed tick, code refresh, ...) — crossfade.
+        } else if (boundText != previousSignature && boundText.isNotEmpty()) {
+            // Content changed in place (speed tick, code refresh, slot update) —
+            // crossfade.
             target?.animate()?.alpha(0.45f)?.setDuration(60)
                 ?.withEndAction {
                     target?.animate()?.alpha(1f)?.setDuration(160)?.start()
@@ -363,14 +444,20 @@ class CapsuleOverlayManager(appContext: Context) {
         }
     }
 
-    private fun showSkipReason(payload: CapsulePayload): String? {
+    /** Best-effort slot key for a payload (fallback/speed payloads are unkeyed). */
+    private fun keyForPayload(payload: CapsulePayload): String {
+        slots.firstOrNull { it.payload == payload }?.let { return it.key }
+        return payload.suppressKey
+    }
+
+    private fun showSkipReason(payload: CapsulePayload, key: String): String? {
         if (Build.VERSION.SDK_INT >= LIVE_UPDATES_MIN_SDK_INT) {
             return "sdk-36-plus"
         }
         if (MainActivity.appInForeground) {
             return "app-foreground"
         }
-        if (suppressedKey == payload.suppressKey) {
+        if (suppressedKey == key) {
             return "suppressed"
         }
         return try {
@@ -479,7 +566,7 @@ class CapsuleOverlayManager(appContext: Context) {
                 text.setTextColor(Color.parseColor("#B3FFFFFF"))
             }
         }
-        boundText = payload.text
+        boundText = "${payload.title}|${payload.text}"
 
         if (payload.kind == CapsuleKind.PROGRESS) {
             progress.max = payload.progressMax
@@ -492,6 +579,39 @@ class CapsuleOverlayManager(appContext: Context) {
         if (!isDragging && !isLongPressDragging) {
             root.alpha = 1f
             root.translationY = 0f
+        }
+
+        updateDots(root)
+    }
+
+    /** Pager indicator: one dot per active slot, visible with 2+ slots. */
+    private fun updateDots(root: View) {
+        val dots = root.findViewById<LinearLayout>(R.id.capsule_dots) ?: return
+        dots.removeAllViews()
+        if (slots.size <= 1 || overlayPayload != null) {
+            dots.visibility = View.GONE
+            return
+        }
+        dots.visibility = View.VISIBLE
+        val size = dp(5f)
+        val margin = dp(3f)
+        for (i in slots.indices) {
+            val dot = View(context)
+            val lp = LinearLayout.LayoutParams(size, size)
+            lp.marginStart = margin
+            lp.marginEnd = margin
+            dot.layoutParams = lp
+            dot.background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(
+                    if (i == currentSlotIndex) {
+                        Color.parseColor("#B79CFF")
+                    } else {
+                        Color.parseColor("#40FFFFFF")
+                    }
+                )
+            }
+            dots.addView(dot)
         }
     }
 
@@ -509,6 +629,10 @@ class CapsuleOverlayManager(appContext: Context) {
                     isDragging = false
                     isLongPressDragging = false
                     longPressPending = true
+                    velocityTracker?.recycle()
+                    velocityTracker = VelocityTracker.obtain().apply {
+                        addMovement(event)
+                    }
                     positionHandler.removeCallbacks(longPressRunnable)
                     positionHandler.postDelayed(longPressRunnable, 450L)
                     true
@@ -516,6 +640,7 @@ class CapsuleOverlayManager(appContext: Context) {
                 MotionEvent.ACTION_MOVE -> {
                     lastX = event.rawX
                     lastY = event.rawY
+                    velocityTracker?.addMovement(event)
                     val dx = event.rawX - downX
                     val dy = event.rawY - downY
                     if (longPressPending && (abs(dx) > dragStartPx || abs(dy) > dragStartPx)) {
@@ -525,7 +650,10 @@ class CapsuleOverlayManager(appContext: Context) {
                     if (isLongPressDragging) {
                         moveWindow((lastX - grabOffsetX).toInt(), (lastY - grabOffsetY).toInt())
                     } else {
-                        if (dy > dragStartPx) {
+                        // Vertical motion only becomes drag-to-dismiss when it is
+                        // also the dominant axis — horizontal swipes must not
+                        // trigger it.
+                        if (dy > dragStartPx && abs(dy) >= abs(dx)) {
                             isDragging = true
                         }
                         if (isDragging) {
@@ -538,10 +666,30 @@ class CapsuleOverlayManager(appContext: Context) {
                 MotionEvent.ACTION_UP -> {
                     positionHandler.removeCallbacks(longPressRunnable)
                     longPressPending = false
+                    var vx = 0f
+                    var vy = 0f
+                    val tracker = velocityTracker
+                    if (tracker != null) {
+                        tracker.addMovement(event)
+                        tracker.computeCurrentVelocity(1000)
+                        vx = tracker.xVelocity
+                        vy = tracker.yVelocity
+                        tracker.recycle()
+                        velocityTracker = null
+                    }
                     when {
                         isLongPressDragging -> {
                             isLongPressDragging = false
                             persistWindowPosition()
+                        }
+                        !isDragging &&
+                            slots.size > 1 &&
+                            abs(vx) > SWIPE_MIN_VELOCITY &&
+                            abs(vx) > abs(vy) * 1.5f -> {
+                            // Horizontal fling — switch between active slots.
+                            swipeToSlot(
+                                if (vx < 0) currentSlotIndex + 1 else currentSlotIndex - 1
+                            )
                         }
                         isDragging && event.rawY - downY > dismissThresholdPx -> {
                             dismissed()
@@ -559,6 +707,8 @@ class CapsuleOverlayManager(appContext: Context) {
                 MotionEvent.ACTION_CANCEL -> {
                     positionHandler.removeCallbacks(longPressRunnable)
                     longPressPending = false
+                    velocityTracker?.recycle()
+                    velocityTracker = null
                     isDragging = false
                     isLongPressDragging = false
                     v.animate().alpha(1f).translationY(0f).setDuration(120).start()
@@ -567,6 +717,34 @@ class CapsuleOverlayManager(appContext: Context) {
                 else -> false
             }
         }
+    }
+
+    /** Fling between active slots: crossfade with a horizontal slide. */
+    private fun swipeToSlot(target: Int) {
+        val v = view ?: return
+        val next = slots.getOrNull(target)?.payload
+        if (next == null) {
+            v.animate().translationX(0f).setDuration(120).start()
+            return
+        }
+        val direction = if (target > currentSlotIndex) 1 else -1
+        currentSlotIndex = target
+        val slide = dp(56f).toFloat()
+        Log.d(
+            TAG,
+            "swipe to slot $target: ${next.packageName} | ${next.title}"
+        )
+        v.animate()
+            .translationX(-direction * slide)
+            .alpha(0f)
+            .setDuration(90)
+            .withEndAction {
+                bindView(v, next)
+                v.translationX = direction * slide
+                v.alpha = 0f
+                v.animate().translationX(0f).alpha(1f).setDuration(140).start()
+            }
+            .start()
     }
 
     private fun moveWindow(xPx: Int, yPx: Int) {
@@ -619,20 +797,34 @@ class CapsuleOverlayManager(appContext: Context) {
             removeView()
             return
         }
-        lastPayload?.let { suppressedKey = it.suppressKey }
-        view?.let { pill ->
-            pill.animate()
-                .alpha(0f)
-                .translationY(dp(72f).toFloat())
-                .setDuration(160)
-                .withEndAction {
-                    if (suppressedKey == lastPayload?.suppressKey) {
-                        lastPayload = null
-                        removeView()
-                    }
-                }
-                .start()
+        if (overlayPayload != null) {
+            // Swiping a transient overlay away returns to the state underneath.
+            overlayPayload = null
+            positionHandler.removeCallbacks(overlayReturnRunnable)
+            val payload = displayedPayload()
+            if (payload != null) {
+                render(payload)
+            } else {
+                removeView()
+            }
+            return
         }
+        val current = slots.getOrNull(currentSlotIndex)
+        if (current != null) {
+            // Suppress this key so the same mirror does not immediately
+            // reappear on the next update; the pill moves to the next slot.
+            suppressedKey = current.key
+            val hadMore = slots.size > 1 || lastVpnFallback != null || lastSpeed != null
+            removeSlot(current.key, animateExit = !hadMore)
+            return
+        }
+        if (activeKind == CapsuleKind.VPN && lastVpnFallback != null) {
+            // System VPN pill swiped away — the monitor may re-add it on the
+            // next network change.
+            clearVpnFallback()
+            return
+        }
+        removeView()
     }
 
     private fun openApp() {
@@ -705,5 +897,6 @@ class CapsuleOverlayManager(appContext: Context) {
         const val TAG = "CapsuleOverlay"
         const val LIVE_UPDATES_MIN_SDK_INT = 36
         const val TRANSIENT_OVERLAY_MS = 3_500L
+        const val SWIPE_MIN_VELOCITY = 300f
     }
 }
