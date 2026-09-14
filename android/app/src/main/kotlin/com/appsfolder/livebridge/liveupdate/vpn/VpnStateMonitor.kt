@@ -79,14 +79,12 @@ object VpnStateMonitor {
 
     private fun handleCapabilities(capabilities: NetworkCapabilities) {
         val isVpn = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
-        val packageName = if (isVpn) capabilities.getVpnPackage() else null
-        Log.d(TAG, "vpn state: $isVpn package=$packageName")
+        Log.d(TAG, "vpn state: $isVpn")
         if (isVpn) {
-            activeVpnPackage = packageName
-            if (packageName != lastPushedPackage) {
-                lastPushedPackage = packageName
+            if (activeVpnPackage == null) {
+                activeVpnPackage = "active"
                 try {
-                    LiveUpdateNotifier.capsuleOverlay?.showVpnFallback(packageName)
+                    LiveUpdateNotifier.capsuleOverlay?.showVpnFallback(null)
                 } catch (error: Throwable) {
                     Log.w(TAG, "showVpnFallback failed", error)
                 }
